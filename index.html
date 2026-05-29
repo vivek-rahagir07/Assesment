@@ -675,7 +675,7 @@
       }
 
       try {
-        const wsRef = doc(db, 'artifacts', app_id, 'public', 'workspaces', wsName);
+        const wsRef = doc(db, 'artifacts', app_id, 'workspaces', wsName);
         const wsSnap = await getDoc(wsRef);
         
         if (wsSnap.exists()) {
@@ -1241,7 +1241,7 @@
     const handleDeleteTemplate = async (id) => {
       if (window.confirm("Delete this form template permanently?")) {
         try {
-          await deleteDoc(doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates', id));
+          await deleteDoc(doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates', id));
           showToast('Template removed successfully.');
         } catch (err) {
           showToast('Deletion error.', 'error');
@@ -1268,11 +1268,11 @@
 
       try {
         if (editingTemplateId) {
-          const docRef = doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates', editingTemplateId);
+          const docRef = doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates', editingTemplateId);
           await updateDoc(docRef, templateData);
           showToast('Rubric form template updated successfully!');
         } else {
-          const collectionRef = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates');
+          const collectionRef = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
           await addDoc(collectionRef, templateData);
           showToast('Dynamic form template published!');
         }
@@ -1378,7 +1378,7 @@
       };
 
       try {
-        const candidatesCollection = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates');
+        const candidatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
         await addDoc(candidatesCollection, candidateData);
         showToast(`${candidateData.name} evaluated and calibrated successfully!`);
         cleanupActiveInterview();
@@ -1392,7 +1392,7 @@
     const handleDeleteCandidate = async (id) => {
       if (window.confirm("Remove candidate trial evaluation report permanently?")) {
         try {
-          await deleteDoc(doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates', id));
+          await deleteDoc(doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates', id));
           showToast('Evaluation report deleted.');
         } catch (err) {
           showToast('Could not delete report.', 'error');
@@ -1429,7 +1429,7 @@
       
       try {
         // 1. Create standard form template
-        const templateCollectionRef = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates');
+        const templateCollectionRef = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
         const defaultForm = {
           title: "Standard Mock Interview Evaluation Form",
           description: "Official structured rubric containing both Image 1 and Image 2 standards: NS/S/VS checklist ratings, Likert indicator checklists, Strengths/Weaknesses fields, and overall calibration metric outputs.",
@@ -1441,7 +1441,7 @@
         const createdTpl = await addDoc(templateCollectionRef, defaultForm);
 
         // 2. Create mock candidates evaluated on this standard
-        const candidatesCollectionRef = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates');
+        const candidatesCollectionRef = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
         const mockCandidates = [
           {
             name: "Rohan Varma",
@@ -1574,8 +1574,8 @@
     const setupFirestoreSync = () => {
       if (!currentWorkspace) return;
 
-      const templatesCollection = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates');
-      const candidatesCollection = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates');
+      const templatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
+      const candidatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
 
       if (unsubscribeTemplates) unsubscribeTemplates();
       if (unsubscribeCandidates) unsubscribeCandidates();
