@@ -697,7 +697,7 @@
         }
       } catch (err) {
         console.error(err);
-        wsErrorMsg.textContent = "Error connecting to workspace.";
+        wsErrorMsg.textContent = "Error: " + err.message;
         wsErrorMsg.classList.remove('hidden');
       }
     });
