@@ -1037,17 +1037,91 @@ select:focus-visible {
 }
 
 .btn-score-select,
-.btn-likert-choice,
-.btn-copy-report,
-.btn-delete-cand {
+.btn-likert-choice {
   transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 .btn-score-select:hover,
-.btn-likert-choice:hover,
-.btn-copy-report:hover,
-.btn-delete-cand:hover {
+.btn-likert-choice:hover {
   transform: translateY(-1px);
+}
+
+/* ── Action buttons (table row icons) ── */
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--ease-out-expo),
+    box-shadow 0.2s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.action-btn:hover {
+  transform: translateY(-2px) scale(1.08);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.action-btn:active {
+  transform: translateY(0) scale(0.96);
+  box-shadow: none;
+}
+
+/* Indigo — View */
+.action-btn--indigo {
+  background: #eef2ff;
+  color: #4f46e5;
+  border-color: #c7d2fe;
+}
+.action-btn--indigo:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+  box-shadow: 0 4px 12px rgba(99,102,241,0.25);
+}
+
+/* Slate — Print / Copy */
+.action-btn--slate {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+.action-btn--slate:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(71,85,105,0.15);
+}
+
+/* Violet — PDF */
+.action-btn--violet {
+  background: #f5f3ff;
+  color: #7c3aed;
+  border-color: #ddd6fe;
+}
+.action-btn--violet:hover {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  box-shadow: 0 4px 12px rgba(124,58,237,0.22);
+}
+
+/* Rose — Delete */
+.action-btn--rose {
+  background: #fff1f2;
+  color: #e11d48;
+  border-color: #fecdd3;
+}
+.action-btn--rose:hover {
+  background: #ffe4e6;
+  border-color: #fda4af;
+  box-shadow: 0 4px 12px rgba(225,29,72,0.22);
 }
 
 /* ── Background decorations ── */

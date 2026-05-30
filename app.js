@@ -1928,26 +1928,61 @@ const renderAnalytics = () => {
   filtered.forEach((cand) => {
     const category = getPerformerCategory(cand.calculatedScore);
     const row = document.createElement('tr');
-    row.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+    row.className = 'hover:bg-slate-50/70 transition-colors border-b border-slate-100 group';
     row.innerHTML = `
       <td class="p-4">
-        <span class="font-bold text-slate-900 block">${cand.name}</span>
-        <span class="text-[10px] text-slate-400">${cand.role}</span>
+        <span class="font-semibold text-slate-900 block text-sm leading-tight">${cand.name}</span>
+        <span class="text-[11px] text-slate-400 mt-0.5 block">${cand.role || '—'}</span>
       </td>
       <td class="p-4">
-        <span class="font-medium text-slate-800 block">${cand.interviewer}</span>
-        <span class="text-[10px] text-slate-400">${cand.date || 'No Date'}</span>
+        <span class="font-medium text-slate-700 block text-sm leading-tight">${cand.interviewer || '—'}</span>
+        <span class="text-[11px] text-slate-400 mt-0.5 block">${cand.date || 'No date'}</span>
       </td>
-      <td class="p-4 font-mono font-black text-slate-950 text-sm">${cand.calculatedScore}%</td>
-      <td class="p-4"><span class="inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold ${category.color}">${category.label}</span></td>
-      <td class="p-4 max-w-[150px] truncate" title="${cand.strengths || '-'}">${cand.strengths || '-'}</td>
-      <td class="p-4 max-w-[150px] truncate" title="${cand.weaknesses || '-'}">${cand.weaknesses || '-'}</td>
-      <td class="p-4 text-right space-x-1 whitespace-nowrap">
-        <button class="btn-view-cand p-2 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100" title="View full evaluation">👁</button>
-        <button class="btn-print-cand p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100" title="Print scorecard">🖨</button>
-        <button class="btn-pdf-cand p-2 bg-violet-50 text-violet-600 rounded-full hover:bg-violet-100" title="Download PDF scorecard">📄</button>
-        <button class="btn-copy-report p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100" title="Copy scorecard report to clipboard">📋</button>
-        <button class="btn-delete-cand p-2 bg-rose-50 text-rose-600 rounded-full hover:bg-rose-100" title="Remove Evaluation permanently">🗑</button>
+      <td class="p-4">
+        <span class="font-black text-slate-900 text-sm tabular-nums">${cand.calculatedScore}%</span>
+      </td>
+      <td class="p-4">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full border text-[10px] font-bold tracking-wide ${category.color}">${category.label}</span>
+      </td>
+      <td class="p-4 max-w-[140px]">
+        <span class="block truncate text-xs text-slate-600" title="${cand.strengths || '—'}">${cand.strengths || '—'}</span>
+      </td>
+      <td class="p-4 max-w-[140px]">
+        <span class="block truncate text-xs text-slate-600" title="${cand.weaknesses || '—'}">${cand.weaknesses || '—'}</span>
+      </td>
+      <td class="p-4 text-right">
+        <div class="inline-flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+          <!-- View -->
+          <button class="btn-view-cand action-btn action-btn--indigo" title="View full evaluation" aria-label="View evaluation">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+          <!-- Print -->
+          <button class="btn-print-cand action-btn action-btn--slate" title="Print scorecard" aria-label="Print scorecard">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+            </svg>
+          </button>
+          <!-- PDF -->
+          <button class="btn-pdf-cand action-btn action-btn--violet" title="Download PDF" aria-label="Download PDF">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          </button>
+          <!-- Copy -->
+          <button class="btn-copy-report action-btn action-btn--slate" title="Copy report to clipboard" aria-label="Copy report">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <!-- Delete -->
+          <button class="btn-delete-cand action-btn action-btn--rose" title="Delete evaluation" aria-label="Delete evaluation">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
       </td>
     `;
 
@@ -1985,9 +2020,18 @@ const renderDistributionChart = (filteredList, topT, midT, lowT) => {
       ${lowT.length > 0 ? `<div style="width: ${lowPct}%" class="bg-rose-500 text-white font-extrabold text-[10px] flex items-center justify-center transition-all">Low: ${lowPct}%</div>` : ''}
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-      <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-3xl text-emerald-800 text-xs font-bold">⭐ Top tier (${topT.length} candidates)</div>
-      <div class="p-3 bg-amber-50 border border-amber-200 rounded-3xl text-amber-800 text-xs font-bold">⚖️ Mid tier (${midT.length} candidates)</div>
-      <div class="p-3 bg-rose-50 border border-rose-200 rounded-3xl text-rose-800 text-xs font-bold">⚠️ Low tier (${lowT.length} candidates)</div>
+      <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-3xl text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Top tier (${topT.length} candidates)
+      </div>
+      <div class="p-3 bg-amber-50 border border-amber-200 rounded-3xl text-amber-800 text-xs font-bold flex items-center justify-center gap-1.5">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+        Mid tier (${midT.length} candidates)
+      </div>
+      <div class="p-3 bg-rose-50 border border-rose-200 rounded-3xl text-rose-800 text-xs font-bold flex items-center justify-center gap-1.5">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Low tier (${lowT.length} candidates)
+      </div>
     </div>
   `;
 };
