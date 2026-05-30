@@ -1402,6 +1402,51 @@ select:focus-visible {
   align-items: flex-start;
 }
 
+.panel-candidates-scroll {
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.panel-import-list {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  background: #fff;
+}
+
+.panel-import-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.panel-import-row:hover {
+  background: #f8fafc;
+}
+
+.panel-import-row.is-duplicate {
+  opacity: 0.55;
+}
+
+.panel-import-row input[type="checkbox"] {
+  flex-shrink: 0;
+  accent-color: #7c3aed;
+}
+
+.panel-import-row__name {
+  flex: 1;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.panel-import-row__role {
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
 .panel-scorecard-item--submitted {
   border-color: #a7f3d0;
   background: #ecfdf5;

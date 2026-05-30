@@ -628,13 +628,32 @@
           <button type="button" id="btn-copy-panel-code" class="mt-2 rounded-full border border-violet-300 bg-white px-4 py-2 text-xs font-bold text-violet-800 hover:bg-violet-50">Copy code</button>
         </div>
         <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-          <p class="text-xs font-bold text-slate-800">Candidates on this rubric</p>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <p class="text-xs font-bold text-slate-800">Candidates on this rubric</p>
+            <span id="panel-candidate-count" class="text-[10px] font-semibold text-slate-500"></span>
+          </div>
+
+          <div class="rounded-xl border border-dashed border-violet-300 bg-violet-50/50 p-3 space-y-2">
+            <p class="text-[11px] font-semibold text-violet-900">Import roster from Excel, CSV, or PDF</p>
+            <p class="text-[10px] text-violet-800/80 leading-relaxed">Upload a sheet with a <strong>Name</strong> column (or names in the first column). We detect candidate names and add them to this panel.</p>
+            <label class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-violet-300 bg-white px-4 py-2 text-xs font-bold text-violet-800 hover:bg-violet-100 transition">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Choose file
+              <input type="file" id="panel-import-file" class="hidden" accept=".xlsx,.xls,.csv,.pdf,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+            </label>
+          </div>
+
+          <div class="relative">
+            <svg class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="search" id="panel-candidate-search" class="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm" placeholder="Search candidates by name…" autocomplete="off" />
+          </div>
+
           <div class="flex flex-col sm:flex-row gap-2">
-            <input type="text" id="panel-add-candidate-name" class="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm" placeholder="Candidate name" />
+            <input type="text" id="panel-add-candidate-name" class="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm" placeholder="Or add one manually" />
             <input type="text" id="panel-add-candidate-role" class="sm:w-36 rounded-xl border border-slate-300 px-3 py-2 text-sm" placeholder="Role" />
             <button type="button" id="btn-panel-add-candidate" class="rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 shrink-0">Add</button>
           </div>
-          <ul id="panel-hub-candidates-list" class="panel-scorecard-list"></ul>
+          <ul id="panel-hub-candidates-list" class="panel-scorecard-list panel-candidates-scroll"></ul>
         </div>
         <div id="panel-hub-selected-section" class="hidden space-y-3 border-t border-slate-200 pt-4">
           <p class="text-xs font-bold text-slate-700">Selected: <span id="panel-hub-selected-name" class="text-violet-700"></span></p>
@@ -648,6 +667,29 @@
             <button type="button" id="btn-start-my-scorecard" class="rounded-full bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700">Open my scorecard</button>
             <button type="button" id="btn-finalize-panel" class="rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-700">Finalize this candidate</button>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel: import preview -->
+  <div id="panel-import-modal" class="panel-modal hidden" role="dialog" aria-modal="true" aria-labelledby="panel-import-title">
+    <div class="panel-modal-backdrop" data-panel-close="panel-import-modal"></div>
+    <div class="panel-modal-panel panel-modal-panel--wide">
+      <div class="panel-modal-header">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600">Import roster</p>
+          <h2 id="panel-import-title" class="text-lg font-bold text-slate-900 mt-1">Review candidates to import</h2>
+          <p id="panel-import-subtitle" class="text-xs text-slate-500 mt-1"></p>
+        </div>
+        <button type="button" class="panel-modal-close" data-panel-close="panel-import-modal" aria-label="Close">&times;</button>
+      </div>
+      <div class="panel-modal-body space-y-4">
+        <p class="text-xs text-slate-600">Uncheck any rows you don’t want. Duplicates already in this panel will be skipped on import.</p>
+        <div id="panel-import-list" class="panel-import-list max-h-64 overflow-y-auto space-y-1"></div>
+        <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
+          <button type="button" id="btn-panel-import-confirm" class="rounded-full bg-violet-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-violet-700">Import selected</button>
+          <button type="button" class="rounded-full border border-slate-300 px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50" data-panel-close="panel-import-modal">Cancel</button>
         </div>
       </div>
     </div>

@@ -36,6 +36,9 @@ let panelScorecards = [];
 let panelTemplateForCreate = null;
 let unsubscribePanelCandidates = null;
 let unsubscribePanelScorecards = null;
+let panelCandidateSearchQuery = '';
+let pendingImportRows = [];
+let pendingImportFileName = '';
 let candidateScores = {};
 let candidateNotes = {};
 let likertResponses = {};
@@ -156,7 +159,8 @@ let liveInterviewAutosaveBound = false;
 const SCRIPT_URLS = {
   chart: 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
   xlsx: 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js',
-  html2pdf: 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+  html2pdf: 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+  pdfjs: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
 };
 
 const scriptPromises = {};
@@ -880,10 +884,23 @@ const renderPanelHubContent = () => {
 
   if (panelHubCandidatesList) {
     panelHubCandidatesList.innerHTML = '';
+    const filtered = getFilteredPanelCandidates();
+    const countEl = document.getElementById('panel-candidate-count');
+    if (countEl) {
+      const total = panelCandidates.length;
+      if (panelCandidateSearchQuery.trim()) {
+        countEl.textContent = `${filtered.length} of ${total} shown`;
+      } else {
+        countEl.textContent = total ? `${total} candidate${total !== 1 ? 's' : ''}` : '';
+      }
+    }
+
     if (panelCandidates.length === 0) {
-      panelHubCandidatesList.innerHTML = '<li class="text-xs text-slate-500 py-2">No candidates yet — add one below, then evaluators score them using this panel code.</li>';
+      panelHubCandidatesList.innerHTML = '<li class="text-xs text-slate-500 py-2">No candidates yet — import a roster, add manually, then evaluators score using this panel code.</li>';
+    } else if (filtered.length === 0) {
+      panelHubCandidatesList.innerHTML = '<li class="text-xs text-slate-500 py-2">No candidates match your search.</li>';
     } else {
-      panelCandidates.forEach((cand) => {
+      filtered.forEach((cand) => {
         const li = document.createElement('li');
         const isSelected = cand.id === activePanelCandidateId;
         const isFinalized = cand.status === 'finalized';
@@ -970,6 +987,9 @@ const openPanelHub = async (panelId) => {
     activePanelCandidateId = null;
     activePanelCandidate = null;
     panelScorecards = [];
+    panelCandidateSearchQuery = '';
+    const searchInput = document.getElementById('panel-candidate-search');
+    if (searchInput) searchInput.value = '';
     subscribePanelCandidates(panelId);
     renderPanelHubContent();
     openPanelModal('panel-hub-modal');
@@ -1048,32 +1068,294 @@ const createOrOpenPanelForTemplate = async (template) => {
   }
 };
 
-const addCandidateToPanel = async (name, role) => {
+const addCandidateToPanel = async (name, role, options = {}) => {
+  const { selectAfter = true, silent = false, importSource = null } = options;
   if (!activePanelId || !user) return null;
   const candidateName = name?.trim();
   if (!candidateName) {
-    showToast('Enter a candidate name.', 'error');
+    if (!silent) showToast('Enter a candidate name.', 'error');
     return null;
   }
 
+  const normalized = normalizeCandidateNameKey(candidateName);
+  const duplicate = panelCandidates.find((c) => normalizeCandidateNameKey(c.candidateName) === normalized);
+  if (duplicate) {
+    if (!silent) showToast(`${candidateName} is already on this panel.`, 'info');
+    if (selectAfter) selectPanelCandidate(duplicate.id);
+    return duplicate.id;
+  }
+
   try {
-    const ref = await addDoc(panelCandidatesCollectionRef(activePanelId), {
-      candidateName,
+    const payload = {
+      candidateName: titleCaseCandidateName(candidateName),
       candidateRole: (role || activePanel?.templateSnapshot?.role || '').trim(),
       status: 'open',
       compiled: null,
       createdAt: new Date().toISOString(),
       createdBy: user.uid
-    });
-    document.getElementById('panel-add-candidate-name').value = '';
-    document.getElementById('panel-add-candidate-role').value = '';
-    selectPanelCandidate(ref.id);
-    showToast(`${candidateName} added — select Score to begin.`, 'success');
+    };
+    if (importSource) {
+      payload.importSource = importSource;
+      payload.importedAt = new Date().toISOString();
+    }
+
+    const ref = await addDoc(panelCandidatesCollectionRef(activePanelId), payload);
+    if (!silent) {
+      document.getElementById('panel-add-candidate-name').value = '';
+      document.getElementById('panel-add-candidate-role').value = '';
+    }
+    if (selectAfter) {
+      selectPanelCandidate(ref.id);
+      if (!silent) showToast(`${candidateName} added — select Score to begin.`, 'success');
+    }
     return ref.id;
   } catch (err) {
     console.error(err);
-    showToast('Could not add candidate.', 'error');
+    if (!silent) showToast('Could not add candidate.', 'error');
     return null;
+  }
+};
+
+// ── Roster import (Excel / CSV / PDF) ──
+
+const NAME_COLUMN_HINTS = ['name', 'candidate', 'candidate name', 'full name', 'applicant', 'student', 'student name', 'interviewee', 'employee', 'applicant name'];
+const ROLE_COLUMN_HINTS = ['role', 'position', 'title', 'job', 'job title', 'position title', 'designation'];
+const ROSTER_SKIP_PATTERNS = /^(name|candidate|email|phone|sr\.?\s*no|s\.?\s*no|serial|#|id|date|total|marks|score|rank|sl\.?\s*no)/i;
+
+const normalizeCandidateNameKey = (name) => String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+const titleCaseCandidateName = (name) => String(name || '').trim().replace(/\s+/g, ' ')
+  .split(' ')
+  .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+  .join(' ');
+
+const isLikelyPersonName = (str, { loose = false } = {}) => {
+  const s = String(str).trim();
+  if (s.length < 2 || s.length > 80) return false;
+  if (/^\d+([.,]\d+)?$/.test(s)) return false;
+  if (/@|https?:|www\.|\.com\b|\.pdf\b|\|/.test(s)) return false;
+  if (ROSTER_SKIP_PATTERNS.test(s)) return false;
+  const words = s.split(/\s+/).filter(Boolean);
+  if (loose) {
+    return words.length >= 1 && words.length <= 6 && /^[\p{L}\d'.\-\s]+$/u.test(s) && !/^\d/.test(s);
+  }
+  if (words.length < 2 || words.length > 5) return false;
+  return words.every((w) => /^[\p{L}'.\-]+$/u.test(w) && w.length > 1);
+};
+
+const dedupeImportRows = (rows) => {
+  const seen = new Set();
+  return rows.filter((row) => {
+    const key = normalizeCandidateNameKey(row.name);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const findSheetColumn = (headers, hints) => {
+  const normalized = headers.map((h) => String(h ?? '').trim().toLowerCase());
+  let idx = normalized.findIndex((h) => hints.some((k) => h === k || h.includes(k) || k.includes(h)));
+  if (idx < 0) idx = normalized.findIndex((h) => hints.some((k) => h.replace(/\s/g, '').includes(k.replace(/\s/g, ''))));
+  return idx;
+};
+
+const extractCandidatesFromSheetRows = (rows) => {
+  if (!rows?.length) return [];
+
+  let startRow = 0;
+  let nameCol = 0;
+  let roleCol = -1;
+
+  const headerCells = (rows[0] || []).map((c) => String(c).trim());
+  const headerLower = headerCells.map((h) => h.toLowerCase());
+  const nameIdx = findSheetColumn(headerLower, NAME_COLUMN_HINTS);
+
+  if (nameIdx >= 0) {
+    startRow = 1;
+    nameCol = nameIdx;
+    roleCol = findSheetColumn(headerLower, ROLE_COLUMN_HINTS);
+  }
+
+  const out = [];
+  for (let i = startRow; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row.length) continue;
+    const rawName = String(row[nameCol] ?? '').trim();
+    if (!rawName) continue;
+    if (!isLikelyPersonName(rawName, { loose: true }) && !isLikelyPersonName(rawName)) continue;
+
+    const role = roleCol >= 0 ? String(row[roleCol] ?? '').trim() : '';
+    out.push({
+      name: titleCaseCandidateName(rawName),
+      role: role && !ROSTER_SKIP_PATTERNS.test(role) ? role : ''
+    });
+  }
+  return dedupeImportRows(out);
+};
+
+const parseSpreadsheetFile = async (file) => {
+  await loadScript(SCRIPT_URLS.xlsx);
+  if (!window.XLSX) throw new Error('Excel library failed to load.');
+  const buffer = await file.arrayBuffer();
+  const workbook = window.XLSX.read(buffer, { type: 'array' });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) return [];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  return extractCandidatesFromSheetRows(rows);
+};
+
+const extractNamesFromPdfText = (text) => {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const out = [];
+  for (const line of lines) {
+    const cleaned = line.replace(/\s{2,}/g, ' ').replace(/^\d+[.)]\s*/, '').trim();
+    if (!cleaned) continue;
+    if (isLikelyPersonName(cleaned, { loose: true }) || isLikelyPersonName(cleaned)) {
+      out.push({ name: titleCaseCandidateName(cleaned), role: '' });
+    }
+  }
+  return dedupeImportRows(out);
+};
+
+const parsePdfFile = async (file) => {
+  await loadScript(SCRIPT_URLS.pdfjs);
+  const pdfjsLib = window.pdfjsLib;
+  if (!pdfjsLib) throw new Error('PDF library failed to load.');
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  let fullText = '';
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item) => item.str).join(' ');
+    fullText += `${pageText}\n`;
+  }
+
+  return extractNamesFromPdfText(fullText);
+};
+
+const parseRosterFile = async (file) => {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'pdf') return parsePdfFile(file);
+  if (['xlsx', 'xls', 'csv'].includes(ext)) return parseSpreadsheetFile(file);
+  throw new Error('Unsupported file type. Use .xlsx, .xls, .csv, or .pdf');
+};
+
+const getFilteredPanelCandidates = () => {
+  const q = panelCandidateSearchQuery.trim().toLowerCase();
+  if (!q) return panelCandidates;
+  return panelCandidates.filter((c) => {
+    const name = (c.candidateName || '').toLowerCase();
+    const role = (c.candidateRole || '').toLowerCase();
+    return name.includes(q) || role.includes(q);
+  });
+};
+
+const renderImportPreviewModal = (rows, fileName) => {
+  const listEl = document.getElementById('panel-import-list');
+  const subtitle = document.getElementById('panel-import-subtitle');
+  if (!listEl) return;
+
+  pendingImportRows = rows;
+  if (subtitle) subtitle.textContent = `${rows.length} name${rows.length !== 1 ? 's' : ''} found in ${fileName}`;
+
+  const existingKeys = new Set(panelCandidates.map((c) => normalizeCandidateNameKey(c.candidateName)));
+
+  listEl.innerHTML = '';
+  if (rows.length === 0) {
+    listEl.innerHTML = '<p class="text-xs text-slate-500 p-2">No candidate names detected. Try a sheet with a Name column or one name per line in the PDF.</p>';
+  } else {
+    rows.forEach((row, index) => {
+      const isDup = existingKeys.has(normalizeCandidateNameKey(row.name));
+      const div = document.createElement('label');
+      div.className = `panel-import-row ${isDup ? 'is-duplicate' : ''}`;
+      div.innerHTML = `
+        <input type="checkbox" class="panel-import-check" data-index="${index}" ${isDup ? '' : 'checked'} />
+        <span class="panel-import-row__name">${escapeHtml(row.name)}</span>
+        ${row.role ? `<span class="panel-import-row__role">${escapeHtml(row.role)}</span>` : ''}
+        ${isDup ? '<span class="text-[10px] text-amber-700 font-semibold">Already on panel</span>' : ''}
+      `;
+      listEl.appendChild(div);
+    });
+  }
+
+  openPanelModal('panel-import-modal');
+};
+
+const bulkImportSelectedCandidates = async (importSource) => {
+  if (!activePanelId || !user) return;
+
+  const checks = document.querySelectorAll('.panel-import-check:checked');
+  const selected = [];
+  checks.forEach((el) => {
+    const idx = Number(el.getAttribute('data-index'));
+    if (pendingImportRows[idx]) selected.push(pendingImportRows[idx]);
+  });
+
+  if (selected.length === 0) {
+    showToast('Select at least one candidate to import.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-panel-import-confirm');
+  if (btn) btn.disabled = true;
+
+  let added = 0;
+  let skipped = 0;
+  const existingKeys = new Set(panelCandidates.map((c) => normalizeCandidateNameKey(c.candidateName)));
+
+  try {
+    for (const row of selected) {
+      const key = normalizeCandidateNameKey(row.name);
+      if (existingKeys.has(key)) {
+        skipped++;
+        continue;
+      }
+      const id = await addCandidateToPanel(row.name, row.role, {
+        selectAfter: false,
+        silent: true,
+        importSource
+      });
+      if (id) {
+        added++;
+        existingKeys.add(key);
+      } else {
+        skipped++;
+      }
+    }
+
+    closePanelModal('panel-import-modal');
+    pendingImportRows = [];
+    renderPanelHubContent();
+    showToast(`Imported ${added} candidate${added !== 1 ? 's' : ''}${skipped ? ` (${skipped} skipped as duplicates)` : ''}.`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Import failed. Please try again.', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+const handlePanelRosterImport = async (file) => {
+  if (!activePanelId) {
+    showToast('Open a panel first.', 'error');
+    return;
+  }
+
+  try {
+    showToast('Reading file…', 'info');
+    const rows = await parseRosterFile(file);
+    pendingImportFileName = file.name;
+    renderImportPreviewModal(rows, file.name);
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || 'Could not read that file.', 'error');
   }
 };
 
@@ -1401,6 +1683,21 @@ document.getElementById('btn-panel-add-candidate')?.addEventListener('click', as
   const name = document.getElementById('panel-add-candidate-name')?.value;
   const role = document.getElementById('panel-add-candidate-role')?.value;
   await addCandidateToPanel(name, role);
+});
+
+document.getElementById('panel-candidate-search')?.addEventListener('input', (e) => {
+  panelCandidateSearchQuery = e.target.value;
+  renderPanelHubContent();
+});
+
+document.getElementById('panel-import-file')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (file) await handlePanelRosterImport(file);
+});
+
+document.getElementById('btn-panel-import-confirm')?.addEventListener('click', async () => {
+  await bulkImportSelectedCandidates(pendingImportFileName || 'roster-import');
 });
 
 panelJoinForm?.addEventListener('submit', async (e) => {
