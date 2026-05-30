@@ -484,13 +484,6 @@ workspaceFormNew.addEventListener('submit', async (event) => {
 
 const enterWorkspace = (wsName) => {
   currentWorkspace = wsName;
-  
-  // Hide login card grid and show main app
-  const loginCardGrid = document.querySelector('.login-card-grid');
-  if (loginCardGrid) {
-    loginCardGrid.classList.add('hidden');
-  }
-  
   workspacePanelEntry.classList.add('hidden');
   mainAppContainer.classList.remove('hidden');
   mainAppContainer.classList.add('visible');
@@ -540,13 +533,6 @@ btnSwitchWs.addEventListener('click', () => {
 
   cleanupActiveInterview(true);
   currentWorkspace = null;
-  
-  // Show login card grid again
-  const loginCardGrid = document.querySelector('.login-card-grid');
-  if (loginCardGrid) {
-    loginCardGrid.classList.remove('hidden');
-  }
-  
   workspacePanelEntry.classList.remove('hidden');
   mainAppContainer.classList.add('hidden');
   loginShell?.classList.remove('is-authenticated');
