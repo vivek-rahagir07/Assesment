@@ -300,7 +300,7 @@ workspaceForm.addEventListener('submit', async (event) => {
   setSubmitLoading(true);
 
   try {
-    const wsRef = doc(db, 'artifacts', app_id, 'public', 'workspaces', wsName);
+    const wsRef = doc(db, 'artifacts', app_id, 'workspaces', wsName);
     const wsSnap = await getDoc(wsRef);
     if (wsSnap.exists()) {
       if (wsSnap.data().password === wsPass) {
@@ -319,7 +319,7 @@ workspaceForm.addEventListener('submit', async (event) => {
     }
   } catch (err) {
     console.error(err);
-    showLoginError('Something went wrong on our end. Please try again.');
+    showLoginError(`Error: ${err.message}`);
   }
   setSubmitLoading(false);
 });
@@ -774,7 +774,7 @@ const triggerEditTemplate = (template) => {
 const handleDeleteTemplate = async (id) => {
   if (!window.confirm('Delete this form template permanently?')) return;
   try {
-    await deleteDoc(doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates', id));
+    await deleteDoc(doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates', id));
     showToast('Template removed successfully.');
   } catch (err) {
     showToast('Deletion error.', 'error');
@@ -816,11 +816,11 @@ templateEditorForm.addEventListener('submit', async (event) => {
 
   try {
     if (editingTemplateId) {
-      const docRef = doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates', editingTemplateId);
+      const docRef = doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates', editingTemplateId);
       await updateDoc(docRef, templateData);
       showToast('Rubric form template updated successfully!');
     } else {
-      const collectionRef = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates');
+      const collectionRef = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
       await addDoc(collectionRef, templateData);
       showToast('Dynamic form template published!');
     }
@@ -931,7 +931,7 @@ document.getElementById('live-interview-form').addEventListener('submit', async 
   };
 
   try {
-    const candidatesCollection = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates');
+    const candidatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
     await addDoc(candidatesCollection, candidateData);
     showToast(`${candidateData.name} saved — score ${calculatedScore}%`);
     cleanupActiveInterview();
@@ -947,7 +947,7 @@ document.getElementById('live-interview-form').addEventListener('submit', async 
 const handleDeleteCandidate = async (id) => {
   if (!window.confirm('Delete this evaluation permanently?')) return;
   try {
-    await deleteDoc(doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates', id));
+    await deleteDoc(doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates', id));
     showToast('Evaluation report deleted.');
   } catch (err) {
     showToast('Could not delete report.', 'error');
@@ -984,7 +984,7 @@ const createStandardTemplate = async () => {
   if (templates.length > 0) return;
 
   try {
-    const templateCollectionRef = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates');
+    const templateCollectionRef = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
     await addDoc(templateCollectionRef, {
       title: 'Standard Interview Evaluation',
       description: 'Six core criteria with NS/S/VS ratings and Likert checklist questions.',
@@ -1047,7 +1047,7 @@ const removeLegacySampleCandidates = async () => {
   try {
     await Promise.all(
       legacy.map((c) =>
-        deleteDoc(doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates', c.id))
+        deleteDoc(doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates', c.id))
       )
     );
     showToast(`Removed ${legacy.length} old sample evaluation${legacy.length > 1 ? 's' : ''} from this workspace.`, 'info');
@@ -1060,8 +1060,8 @@ const removeLegacySampleCandidates = async () => {
 const setupFirestoreSync = () => {
   if (!currentWorkspace) return;
 
-  const templatesCollection = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates');
-  const candidatesCollection = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates');
+  const templatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
+  const candidatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
 
   if (unsubscribeTemplates) unsubscribeTemplates();
   if (unsubscribeCandidates) unsubscribeCandidates();
