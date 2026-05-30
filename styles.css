@@ -1395,6 +1395,11 @@ select:focus-visible {
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   font-size: 0.8125rem;
+  flex-wrap: wrap;
+}
+
+#panel-hub-candidates-list .panel-scorecard-item {
+  align-items: flex-start;
 }
 
 .panel-scorecard-item--submitted {
