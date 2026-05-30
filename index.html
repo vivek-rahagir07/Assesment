@@ -1,1606 +1,425 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TalentCalibrate - Structured Interview Evaluator</title>
-  
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <style>
-    /* Premium font stack matching modern neutral look */
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-    }
-    /* Simple custom accent scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #f1f5f9;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col relative">
-
-  <!-- --- WORKSPACE OVERLAY --- -->
-  <div id="workspace-overlay" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 relative overflow-hidden">
-      <div class="absolute top-0 left-0 w-full h-2 bg-indigo-600"></div>
-      
-      <div class="flex items-center space-x-3 mb-6">
-        <div class="p-2 bg-indigo-600 rounded-lg text-white">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-        </div>
-        <div>
-          <h2 class="text-xl font-bold text-slate-900">Workspace Access</h2>
-          <p class="text-xs text-slate-500">Create or join an isolated session</p>
-        </div>
-      </div>
-      
-      <form id="workspace-form" class="space-y-5">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Workspace Name *</label>
-          <input type="text" id="ws-name" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow" placeholder="e.g. Engineering_Q3">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Access Password *</label>
-          <input type="password" id="ws-pass" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow" placeholder="Enter password...">
-        </div>
-        
-        <div id="ws-error-msg" class="hidden bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs font-semibold"></div>
-        
-        <button type="submit" id="btn-ws-submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all flex justify-center items-center">
-          <span>Enter Workspace</span>
-        </button>
-      </form>
-      
-      <p class="text-center text-[10px] text-slate-400 mt-6">
-        If the workspace doesn't exist, it will be created with this password.
-      </p>
+<body class="relative min-h-screen text-slate-900">
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="floating-blob bg-violet-500/30" style="width: 26rem; height: 26rem; left: -6rem; top: 5rem;"></div>
+    <div class="floating-blob bg-cyan-400/25" style="width: 28rem; height: 28rem; right: -8rem; top: 10rem;"></div>
+    <div class="floating-blob bg-amber-400/20" style="width: 24rem; height: 24rem; left: 10rem; bottom: 10rem;"></div>
+    <div class="animated-ring ring-slow" style="left: 52%; top: 32%;"></div>
+    <div class="animated-ring" style="right: 12%; bottom: 18%; width: 560px; height: 560px; border-color: rgba(56, 189, 248, 0.14);"></div>
+    <div class="sparkle-grid">
+      <span class="sparkle sparkle-1"></span>
+      <span class="sparkle sparkle-2"></span>
+      <span class="sparkle sparkle-3"></span>
+      <span class="sparkle sparkle-4"></span>
+      <span class="sparkle sparkle-5"></span>
+      <span class="sparkle sparkle-6"></span>
     </div>
   </div>
 
-  <!-- --- MAIN APP CONTAINER --- -->
-  <div id="main-app-container" class="hidden flex-col min-h-screen w-full flex-1">
-
-  <!-- --- HEADER --- -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between items-center h-16">
-        <div class="flex items-center space-x-3">
-          <div class="p-2 bg-indigo-600 rounded-lg text-white">
-            <!-- Award Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="8" r="7"/>
-              <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+  <main id="login-shell" class="login-shell relative z-10 mx-auto w-full max-w-5xl px-4 py-8 lg:py-12">
+    <div class="login-card-grid overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_32px_80px_rgba(15,23,42,0.08)]">
+      <section id="opening-panel" class="brand-panel relative flex flex-col justify-between p-8 sm:p-10 lg:p-12">
+        <div class="brand-panel-glow" aria-hidden="true"></div>
+        <div class="brand-shimmer" aria-hidden="true"></div>
+        <div class="relative z-10">
+          <div class="brand-logo animate-brand-logo">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+              <rect width="28" height="28" rx="8" fill="rgba(255,255,255,0.15)"/>
+              <path class="logo-chart-line" d="M8 18l4-8 4 5 4-9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <div>
-            <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              TalentCalibrate
-              <span id="header-ws-badge" class="bg-indigo-100 text-indigo-800 text-[10px] uppercase px-2 py-0.5 rounded border border-indigo-200 hidden"></span>
-            </h1>
-            <p class="text-xs text-slate-500 font-medium">Standardized Mock Evaluation & Performance Calibrator</p>
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-3">
-          <button id="btn-switch-ws" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition border border-slate-300">
-            Switch Workspace
-          </button>
-          <button id="btn-mock-loader" class="hidden px-3 py-1.5 text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg transition">
-            Load Official Sample Database
-          </button>
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-            <span class="w-2 h-2 mr-1.5 bg-indigo-500 rounded-full animate-pulse"></span>
-            <span id="auth-status-label">Connecting Auth...</span>
-          </span>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- --- BODY WRAPPER --- -->
-  <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 gap-6">
-    
-    <!-- SIDEBAR NAVIGATION -->
-    <aside class="w-full md:w-64 flex-shrink-0">
-      <nav class="space-y-1 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">Main Menu</p>
-        
-        <button id="nav-dashboard" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition bg-indigo-50 text-indigo-700">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-          <span>Evaluation Rubrics</span>
-        </button>
-
-        <button id="nav-form-builder" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          <span>Customize Rubrics Form</span>
-        </button>
-
-        <button id="nav-class-analytics" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
-          <span>Calibration & Analytics</span>
-        </button>
-
-        <!-- Active Assessment Live Section (Hidden by default) -->
-        <div id="nav-active-assessment-container" class="pt-4 mt-4 border-t border-slate-100 hidden">
-          <p class="text-xs font-semibold text-rose-500 uppercase tracking-wider px-3 mb-1 animate-pulse">● Active Assessment</p>
-          <button id="nav-live-interview" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition text-rose-600 hover:bg-rose-100">
-            <div class="flex items-center space-x-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="12" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></svg>
-              <span id="nav-active-candidate-name" class="truncate max-w-[120px]">Candidate Interview</span>
-            </div>
-            <span id="live-timer" class="text-xs bg-rose-200 text-rose-800 px-1.5 py-0.5 rounded-md font-mono">00:00</span>
-          </button>
-        </div>
-      </nav>
-    </aside>
-
-    <!-- MAIN AREA -->
-    <main class="flex-1 min-w-0">
-      
-      <!-- TOAST CONTAINER -->
-      <div id="toast-wrapper" class="hidden mb-4 p-4 rounded-lg flex items-center justify-between shadow-xs border transition-all">
-        <div class="flex items-center space-x-2">
-          <span class="text-lg">ℹ️</span>
-          <p id="toast-msg" class="text-sm font-medium"></p>
-        </div>
-        <button id="btn-toast-dismiss" class="text-xs font-bold uppercase opacity-60">Dismiss</button>
-      </div>
-
-      <!-- ==========================================
-          TAB: DASHBOARD (CHOOSE/RUN TEMPLATES)
-          ========================================== -->
-      <section id="tab-dashboard-content" class="space-y-6">
-        <!-- Image Standard Intro -->
-        <div class="bg-gradient-to-r from-indigo-700 to-indigo-900 p-6 rounded-xl text-white shadow-xs">
-          <h2 class="text-2xl font-bold tracking-tight">Structured Mock Rubrics Template Active</h2>
-          <p class="text-sm text-indigo-100 mt-2 max-w-3xl">
-            This system enforces the official Mock Evaluation template. Every form contains the 6 foundational criteria (Communication, Interest, Presentation, Application, Problem Solving) with NS/S/VS ratings, accompanied by the behavioral Likert questions loop, strengths weaknesses notepad, and final score calibration.
+          <p id="login-greeting" class="login-greeting animate-in" style="--delay: 0.1s">Good morning</p>
+          <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-white sm:text-4xl animate-in" style="--delay: 0.2s">TalentCalibrate</h1>
+          <p class="mt-3 max-w-xs text-sm leading-relaxed text-indigo-100/90 animate-in" style="--delay: 0.35s">
+            <span id="login-tagline">Where great hiring decisions start — together.</span>
           </p>
         </div>
 
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-bold text-slate-900">Standardized Evaluation Templates</h3>
-            <p class="text-xs text-slate-500">Pick a blueprint to initiate the live grading interface.</p>
+        <ul class="relative z-10 mt-10 space-y-3" aria-label="Platform highlights">
+          <li class="feature-row animate-in" style="--delay: 0.5s">
+            <span class="feature-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            </span>
+            <span>Score candidates fairly, every time</span>
+          </li>
+          <li class="feature-row animate-in" style="--delay: 0.62s">
+            <span class="feature-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            </span>
+            <span>See how your team calibrates live</span>
+          </li>
+          <li class="feature-row animate-in" style="--delay: 0.74s">
+            <span class="feature-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            </span>
+            <span>Build rubrics that fit your process</span>
+          </li>
+        </ul>
+
+        <div class="brand-trust animate-in relative z-10 mt-8 flex items-center gap-3" style="--delay: 0.9s">
+          <div class="trust-avatars" aria-hidden="true">
+            <span class="trust-avatar trust-avatar-1">A</span>
+            <span class="trust-avatar trust-avatar-2">M</span>
+            <span class="trust-avatar trust-avatar-3">K</span>
           </div>
-          <button onclick="switchTab('form-builder')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow-xs">
-            Create Custom Template
-          </button>
+          <p class="text-xs text-indigo-100/75 leading-snug">Trusted by interview panels who care about consistency.</p>
         </div>
 
-        <!-- Dynamic Templates Grid -->
-        <div id="templates-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Populated dynamically via JS -->
-          <div class="bg-white rounded-xl border border-slate-200 p-12 text-center col-span-full">
-            <p class="text-sm text-slate-500 mb-4">Connecting database and loading standard rubrics...</p>
-          </div>
-        </div>
+        <button id="btn-show-workspace" aria-controls="workspace-entry" class="brand-cta relative z-10 mt-6 lg:hidden animate-in" style="--delay: 1s">
+          Let's get you in
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
       </section>
 
-      <!-- ==========================================
-          TAB: FORM BUILDER
-          ========================================== -->
-      <section id="tab-form-builder-content" class="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-6 hidden">
-        <div>
-          <h3 id="form-builder-header-title" class="text-xl font-bold text-slate-900">Create Custom Interview Evaluation Blueprint</h3>
-          <p class="text-xs text-slate-500 mt-1">
-            Adjust default parameters. Standard questions from Page 1 and 2 are systematically baked in by default.
-          </p>
-        </div>
-
-        <form id="template-editor-form" class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="md:col-span-2">
-              <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Form Title *</label>
-              <input type="text" id="tpl-title" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" value="Mock Interview Evaluation Standard Form">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Target Position Role</label>
-              <input type="text" id="tpl-role" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" value="General Candidate Profile">
-            </div>
-
-            <div class="md:col-span-3">
-              <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Description</label>
-              <textarea id="tpl-desc" rows="2" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">Comprehensive standard form featuring verbal, non-verbal communication, organization alignment, resume assessment, and standard Likert performance loops.</textarea>
-            </div>
+      <section id="workspace-panel" class="login-panel p-8 sm:p-10 lg:p-12">
+        <div id="workspace-entry" class="login-form-wrap mx-auto w-full max-w-sm">
+          <div id="login-auth-pill" class="login-auth-pill login-auth-pill--pending animate-in" style="--delay: 0.15s" role="status">
+            <span class="login-auth-dot"></span>
+            <span id="login-auth-label">Connecting you securely…</span>
           </div>
 
-          <div class="border-t border-slate-100 pt-4">
-            <div class="flex justify-between items-center mb-3">
-              <div>
-                <h4 class="font-bold text-slate-900 text-sm">Review Rating Criteria Checklist (Image 1 Rubrics)</h4>
-                <p class="text-[10px] text-slate-500">Every criteria holds scoring options: NS (Not Satisfactory), S (Satisfactory), VS (Very Satisfactory).</p>
-              </div>
-              <button type="button" id="btn-add-criteria" class="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-1.5 rounded font-bold hover:bg-indigo-100 transition flex items-center space-x-1">
-                <span>+ Add Custom Element</span>
-              </button>
-            </div>
-
-            <!-- List Criteria Inputs -->
-            <div id="criteria-inputs-container" class="space-y-3">
-              <!-- Dynamically populated criteria rows -->
-            </div>
-
-            <!-- Weights Indicator -->
-            <div class="mt-3 p-3 bg-slate-100 rounded-lg flex justify-between items-center text-xs font-semibold">
-              <span>Overall Criteria Section Weight:</span>
-              <span id="criteria-weight-indicator" class="text-emerald-600">100%</span>
-            </div>
+          <div class="login-form-header animate-in" style="--delay: 0.25s">
+            <p class="login-eyebrow">Your workspace</p>
+            <h2 class="login-title">Almost there — just sign in</h2>
+            <p class="login-subtitle">Pick any name and password. Returning? We'll open your space. New here? We'll set one up for you.</p>
           </div>
 
-          <div class="border-t border-slate-100 pt-4 flex justify-end space-x-2">
-            <button type="button" onclick="switchTab('dashboard')" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">
-              Back to Blueprints
-            </button>
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-lg">
-              Publish Standards Form
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <!-- ==========================================
-          TAB: LIVE INTERVIEW EVALUATION SHEET
-          ========================================== -->
-      <section id="tab-live-interview-content" class="grid grid-cols-1 lg:grid-cols-12 gap-6 hidden">
-        
-        <!-- Left Column: Primary Sheet -->
-        <form id="live-interview-form" class="lg:col-span-8 space-y-6 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <!-- Header Meta Box -->
-          <div class="border-b border-slate-200 pb-4">
-            <div class="flex justify-between items-center">
-              <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight">Mock Interview Evaluation Form</h3>
-              <div class="flex items-center space-x-2">
-                <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-                <span class="text-xs font-mono bg-rose-100 text-rose-800 px-2.5 py-1 rounded-md font-bold">
-                  Timer: <span class="live-duration-text">00:00</span>
+          <form id="workspace-form" class="login-form" novalidate>
+            <div class="field-group animate-in" style="--delay: 0.38s">
+              <label for="ws-name" class="field-label">What should we call your workspace?</label>
+              <div class="field-input-wrap">
+                <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <input type="text" id="ws-name" required autofocus autocomplete="organization" class="field-input" placeholder="e.g. Engineering_Q3" />
+                <span class="field-check" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                 </span>
               </div>
             </div>
-            <p class="text-xs text-slate-400 mt-0.5">Please check relevant boxes and specify constructive qualitative notes to support your final calibrations.</p>
-          </div>
 
-          <!-- Header Inputs -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Name of Candidate *</label>
-              <input type="text" id="candidate-name" required class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Liam Henderson">
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Position Title</label>
-              <input type="text" id="candidate-role" class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Software Developer">
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Interviewer(s)</label>
-              <input type="text" id="interviewer-name" class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Alex Mercer">
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date of Interview</label>
-              <input type="date" id="date-of-interview" class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none">
-            </div>
-          </div>
-
-          <!-- Rating Criteria (Image 1 Rubrics) -->
-          <div class="border-t border-slate-100 pt-6">
-            <div class="bg-slate-900 text-white rounded-lg p-3 flex flex-col sm:flex-row justify-between sm:items-center gap-1">
-              <span class="text-xs font-bold uppercase tracking-wider">Image 1: Rating Criteria Rubrics</span>
-              <span class="text-[10px] text-slate-300">Rating Key: <strong>NS</strong>: Not Satisfactory | <strong>S</strong>: Satisfactory | <strong>VS</strong>: Very Satisfactory | <strong>NA</strong>: Not Applicable</span>
-            </div>
-
-            <!-- Dynamic Interactive rating blocks -->
-            <div id="live-rating-criteria-container" class="space-y-4 mt-4">
-              <!-- Rendered via JS based on active blueprint -->
-            </div>
-          </div>
-
-          <!-- Behavioral Checklist (Image 2 Loop) -->
-          <div class="border-t border-slate-200 pt-6">
-            <div class="bg-indigo-900 text-white rounded-lg p-3 mb-4">
-              <span class="text-xs font-bold uppercase tracking-wider">Image 2: Feedback & Overarching Evaluation Checklist</span>
-            </div>
-
-            <div id="live-likert-questions-container" class="space-y-4">
-              <!-- Rendered via JS -->
-            </div>
-          </div>
-
-          <!-- Qualitative Summaries (Image 2) -->
-          <div class="border-t border-slate-200 pt-6 space-y-4">
-            <h4 class="font-bold text-slate-900 text-sm">Qualitative Summary Assessment</h4>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Candidate's Strengths:</label>
-                <textarea id="candidate-strengths" rows="3" class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Write down core positives observed..."></textarea>
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Candidate's Weaknesses:</label>
-                <textarea id="candidate-weaknesses" rows="3" class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Detail any limitations or friction points noticed..."></textarea>
+            <div class="field-group animate-in" style="--delay: 0.5s">
+              <label for="ws-pass" class="field-label">Choose a password</label>
+              <div class="field-input-wrap">
+                <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                <input type="password" id="ws-pass" required autocomplete="current-password" class="field-input field-input-password" placeholder="Something you'll remember" />
+                <button type="button" id="btn-toggle-pass" class="field-toggle" aria-label="Show password">
+                  <svg class="icon-show" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="icon-hide hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
               </div>
             </div>
 
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">Overall Verdict / Additional Comments:</label>
-              <textarea id="overall-feedback" rows="3" class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Combine decision statements or any other notes..."></textarea>
+            <div id="ws-error-msg" class="login-error hidden" role="alert"></div>
+
+            <button type="submit" id="btn-ws-submit" class="login-submit animate-in" style="--delay: 0.62s">
+              <span class="login-submit-text">Enter workspace</span>
+              <span class="login-submit-loader hidden" aria-hidden="true"></span>
+              <svg class="login-submit-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </form>
+
+          <p class="login-footnote animate-in" style="--delay: 0.75s">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Only people with your password can join this workspace.
+          </p>
+        </div>
+
+        <div id="login-success-overlay" class="login-success-overlay hidden" aria-live="polite">
+          <div class="login-success-card">
+            <div class="login-success-ring">
+              <svg class="login-success-check" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <p class="login-success-title">You're in!</p>
+            <p id="login-success-msg" class="login-success-sub">Opening your workspace…</p>
+          </div>
+        </div>
+
+      <div id="main-app-container" class="hidden">
+        <header class="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-xl">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-center gap-3">
+              <div class="grid h-12 w-12 place-items-center rounded-3xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/10">
+                <span class="text-xl">★</span>
+              </div>
+              <div>
+                <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">TalentCalibrate <span id="header-ws-badge" class="hidden rounded-full bg-indigo-100 px-3 py-1 text-[10px] font-semibold uppercase text-indigo-800"></span></h1>
+                <p class="text-xs text-slate-500">Structured interview evaluation and team calibration.</p>
+              </div>
             </div>
 
-            <div class="p-3 bg-indigo-50 rounded-lg border border-indigo-200 flex justify-between items-center text-xs">
-              <div>
-                <span class="font-bold block text-indigo-900">Real-Time Calibration Outcome:</span>
-                <span class="text-slate-500">Auto-weighted score of criteria metrics plus checklist evaluations.</span>
-              </div>
-              <span id="live-computed-score-badge" class="bg-indigo-600 text-white font-black text-sm px-3 py-1.5 rounded">
-                0%
+            <div class="flex flex-wrap items-center gap-3">
+              <button id="btn-switch-ws" class="rounded-full border border-slate-300 bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Switch Workspace</button>
+              <span class="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-2 text-xs font-semibold text-indigo-800">
+                <span class="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                <span id="auth-status-label">Connecting Auth...</span>
               </span>
             </div>
           </div>
-
-          <!-- Submit Buttons -->
-          <div class="flex justify-end space-x-2 pt-4 border-t border-slate-100">
-            <button type="button" id="btn-cancel-interview" class="px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg">
-              Cancel Interview
-            </button>
-            <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-6 py-2 rounded-lg shadow-xs">
-              Complete & Save Calibration
-            </button>
-          </div>
-        </form>
-
-        <!-- Right Column: Scratchpad Notepad -->
-        <div class="lg:col-span-4 space-y-4">
-          <div class="bg-amber-50 p-5 rounded-xl border border-amber-200 shadow-xs sticky top-24">
-            <h4 class="font-bold text-amber-900 text-xs uppercase mb-1">💡 Quick Evaluator Notepad</h4>
-            <p class="text-[10px] text-amber-700 mb-3">Scribble quick bullet points. This area is completely isolated for your local workspace.</p>
-            
-            <textarea id="local-scratchpad" rows="12" class="w-full bg-white border border-amber-200 rounded p-2 text-xs font-mono focus:outline-none" placeholder="- Spoke confidently at first.
-- Great answers to verbal communication loops.
-- Problem solving logic is neat but needs SQL scalability polish.
-- Appearance: extremely professional."></textarea>
-
-            <div class="mt-4 pt-4 border-t border-amber-200 space-y-2">
-              <span class="text-[10px] font-bold text-amber-900 block uppercase tracking-wider">Calibration Matrix Tips</span>
-              <ul class="text-[10px] text-amber-800 space-y-1 list-disc pl-4">
-                <li>Use <strong>VS</strong> (Very Satisfactory) for candidates demonstrating fully autonomous output capabilities.</li>
-                <li>Use <strong>NS</strong> (Not Satisfactory) for items that are a critical concern. Explain detail in comments.</li>
-                <li>Checklist loops (Image 2) dynamically weigh into overall class distribution.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ==========================================
-          TAB: CALIBRATION & ANALYTICS
-          ========================================== -->
-      <section id="tab-class-analytics-content" class="space-y-6 hidden">
-        
-        <!-- Score Cutoffs -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
-          <div>
-            <h3 class="font-bold text-slate-900">Class Performance Cutoffs</h3>
-            <p class="text-xs text-slate-500">Tune grading thresholds below to dynamically sort candidates into Top, Mid, and Low performance categories.</p>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Top Performer Minimum Threshold (&#8805; %)</label>
-              <div class="flex items-center space-x-2">
-                <input type="range" id="cutoff-high" min="60" max="95" step="1" value="80" class="w-full accent-emerald-600 cursor-pointer">
-                <span id="label-cutoff-high" class="font-mono font-black text-emerald-800 bg-emerald-50 px-2.5 py-1 border border-emerald-200 rounded text-xs">
-                  80%
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Low Performer Limit (&lt; %)</label>
-              <div class="flex items-center space-x-2">
-                <input type="range" id="cutoff-low" min="30" max="65" step="1" value="50" class="w-full accent-rose-600 cursor-pointer">
-                <span id="label-cutoff-low" class="font-mono font-black text-rose-800 bg-rose-50 px-2.5 py-1 border border-rose-200 rounded text-xs">
-                  50%
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Distributions visual chart bar -->
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
-          <h4 class="font-bold text-slate-900">Active Evaluated Candidate Distribution</h4>
-          
-          <div id="distribution-chart-wrapper">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-
-        <!-- Candidates Matrix Table -->
-        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-          <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
-            <div>
-              <h4 class="font-bold text-slate-900 text-sm">Class Calibration Matrix Table</h4>
-              <p class="text-[10px] text-slate-400">Search by candidate names or interviewer keywords.</p>
-            </div>
-
-            <div class="flex items-center space-x-2">
-              <div class="relative">
-                <!-- Search Icon -->
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 absolute left-2.5 top-2.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-                </svg>
-                <input type="text" id="analytics-search" class="pl-8 pr-3 py-1 bg-white border border-slate-300 rounded-md text-xs focus:outline-none w-44" placeholder="Search standard trials...">
-              </div>
-
-              <select id="analytics-role-filter" class="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs focus:outline-none">
-                <option value="All">All Roles</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs text-left">
-              <thead class="bg-slate-100 text-[10px] uppercase font-bold text-slate-500">
-                <tr>
-                  <th class="p-4">Candidate</th>
-                  <th class="p-4">Assessed By</th>
-                  <th className="p-4">Final Score</th>
-                  <th class="p-4">Grading Category</th>
-                  <th class="p-4">Key Strengths</th>
-                  <th class="p-4">Key Weaknesses</th>
-                  <th class="p-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody id="candidates-table-body" class="divide-y divide-slate-100">
-                <!-- Populated via JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </section>
-
-    </main>
-  </div>
-
-  <!-- --- FOOTER --- -->
-  <footer class="bg-slate-900 text-slate-500 py-6 text-center text-xs mt-auto">
-    <div class="max-w-7xl mx-auto px-4">
-      <p>Structured Calibration Matrix Platform • Built in exact alignment with standardized Mock interview rubrics.</p>
-      <p class="opacity-50 mt-1">Class metrics dynamically aggregate standard NS, S, VS grades and Likert evaluation checklists.</p>
-    </div>
-  </footer>
-  </div> <!-- End Main App Container -->
-
-  <!-- --- FIREBASE AND CLIENT ENGINE (ES MODULE) --- -->
-  <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-    import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-
-    // Global variables populated by environment
-    const app_id = typeof __app_id !== 'undefined' ? __app_id : 'interview-evaluator-pro';
-    const rawFirebaseConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-    
-    const fallbackConfig = {
-      apiKey: "AIzaSyD_rWk0lI2jZpciOkf84-argl8dmTYvAFI",
-      authDomain: "interview-assesment-6a72e.firebaseapp.com",
-      databaseURL: "https://interview-assesment-6a72e-default-rtdb.firebaseio.com",
-      projectId: "interview-assesment-6a72e",
-      storageBucket: "interview-assesment-6a72e.firebasestorage.app",
-      messagingSenderId: "90308736233",
-      appId: "1:90308736233:web:345bf112909e6280c82c78",
-      measurementId: "G-GJCXMKS3Q1"
-    };
-
-    const firebaseConfig = rawFirebaseConfig ? JSON.parse(rawFirebaseConfig) : fallbackConfig;
-
-    // Initialize services
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    // --- APPLICATION STATE ---
-    let user = null;
-    let currentWorkspace = null;
-    let templates = [];
-    let candidates = [];
-    let activeInterviewTemplate = null;
-    
-    // Live rating values state
-    let candidateScores = {};
-    let candidateNotes = {};
-    let likertResponses = {};
-    
-    // Timer State
-    let interviewDuration = 0;
-    let timerInterval = null;
-
-    // Threshold state
-    let scoreThresholds = {
-      high: 80,
-      low: 50
-    };
-
-    // Filter values
-    let filterRole = 'All';
-    let filterQuery = '';
-
-    // Standard static lists
-    const MANDATORY_CRITERIA_DEFAULTS = [
-      { id: 'crit-comm-verbal', name: 'Communication Skills (verbal)', category: 'Communication', maxScore: 3, weight: 15, desc: 'Assess verbal fluency, clarity of thoughts, explanation quality.' },
-      { id: 'crit-comm-nonverbal', name: 'Communication Skills (non-verbal)', category: 'Communication', maxScore: 3, weight: 15, desc: 'Evaluate body language, eye contact, responsiveness, attitude.' },
-      { id: 'crit-interest', name: 'Interest in and knowledge of the position and organization', category: 'Fit', maxScore: 3, weight: 15, desc: 'Understand motivation, homework done on the firm, and excitement.' },
-      { id: 'crit-presentation', name: 'Presentation', category: 'Professionalism', maxScore: 3, weight: 15, desc: 'Promptness, neatness of appearance, business etiquette.' },
-      { id: 'crit-resume', name: 'Resume / Application', category: 'Background', maxScore: 3, weight: 15, desc: 'Relevance of background, past projects, achievements, and layout.' },
-      { id: 'crit-problem-solving', name: 'Problem Solving Skills', category: 'Technical', maxScore: 3, weight: 25, desc: 'Analytical thinking, approaching complexities, scaling up ideas.' }
-    ];
-
-    const MANDATORY_LIKERT_QUESTIONS = [
-      { id: 'likert-1', text: 'The applicant has the knowledge, skills, and abilities to perform the duties of this position.' },
-      { id: 'likert-2', text: 'The applicant views this position with excitement and enthusiasm.' },
-      { id: 'likert-3', text: 'The applicant has the appropriate level of experience necessary for this position.' },
-      { id: 'likert-4', text: 'The applicant displayed the ability to participate effectively in a team environment and motivate/lead.' },
-      { id: 'likert-5', text: 'The applicant displayed ability to communicate well.' },
-      { id: 'likert-6', text: 'The applicant should be included in the final list of recommended applicants.' }
-    ];
-
-    // Form builder state (criteria items currently being designed)
-    let builderCriteria = [...MANDATORY_CRITERIA_DEFAULTS];
-    let editingTemplateId = null;
-
-    // --- DOM ELEMENT REFERENCES ---
-    const workspaceOverlay = document.getElementById('workspace-overlay');
-    const mainAppContainer = document.getElementById('main-app-container');
-    const workspaceForm = document.getElementById('workspace-form');
-    const wsNameInput = document.getElementById('ws-name');
-    const wsPassInput = document.getElementById('ws-pass');
-    const wsErrorMsg = document.getElementById('ws-error-msg');
-    const headerWsBadge = document.getElementById('header-ws-badge');
-    const btnSwitchWs = document.getElementById('btn-switch-ws');
-
-    const navDashboard = document.getElementById('nav-dashboard');
-    const navFormBuilder = document.getElementById('nav-form-builder');
-    const navClassAnalytics = document.getElementById('nav-class-analytics');
-    const navLiveInterview = document.getElementById('nav-live-interview');
-    const navActiveAssessmentContainer = document.getElementById('nav-active-assessment-container');
-    const navActiveCandidateName = document.getElementById('nav-active-candidate-name');
-    const liveTimerLabel = document.getElementById('live-timer');
-
-    const tabDashboardContent = document.getElementById('tab-dashboard-content');
-    const tabFormBuilderContent = document.getElementById('tab-form-builder-content');
-    const tabLiveInterviewContent = document.getElementById('tab-live-interview-content');
-    const tabClassAnalyticsContent = document.getElementById('tab-class-analytics-content');
-
-    const toastWrapper = document.getElementById('toast-wrapper');
-    const toastMsg = document.getElementById('toast-msg');
-    const btnToastDismiss = document.getElementById('btn-toast-dismiss');
-    const btnMockLoader = document.getElementById('btn-mock-loader');
-    const authStatusLabel = document.getElementById('auth-status-label');
-
-    const templatesGrid = document.getElementById('templates-grid');
-    const criteriaInputsContainer = document.getElementById('criteria-inputs-container');
-    const btnAddCriteria = document.getElementById('btn-add-criteria');
-    const templateEditorForm = document.getElementById('template-editor-form');
-    const formBuilderHeaderTitle = document.getElementById('form-builder-header-title');
-
-    // Thresholds
-    const cutoffHighSlider = document.getElementById('cutoff-high');
-    const cutoffLowSlider = document.getElementById('cutoff-low');
-    const labelCutoffHigh = document.getElementById('label-cutoff-high');
-    const labelCutoffLow = document.getElementById('label-cutoff-low');
-
-    // Search and Table
-    const analyticsSearch = document.getElementById('analytics-search');
-    const analyticsRoleFilter = document.getElementById('analytics-role-filter');
-    const candidatesTableBody = document.getElementById('candidates-table-body');
-    const distributionChartWrapper = document.getElementById('distribution-chart-wrapper');
-
-    // --- TOAST NOTIFICATIONS ---
-    const showToast = (message, type = 'success') => {
-      toastMsg.textContent = message;
-      toastWrapper.className = `mb-4 p-4 rounded-lg flex items-center justify-between shadow-xs border transition-all ${
-        type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-      }`;
-      toastWrapper.classList.remove('hidden');
-      setTimeout(() => toastWrapper.classList.add('hidden'), 5000);
-    };
-
-    btnToastDismiss.addEventListener('click', () => toastWrapper.classList.add('hidden'));
-
-    // --- VIEW / TAB SWITCHER ---
-    const switchTab = (tabName) => {
-      // Clear active states on tabs
-      [navDashboard, navFormBuilder, navClassAnalytics, navLiveInterview].forEach(el => {
-        el.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition text-slate-600 hover:bg-slate-50 hover:text-slate-900";
-      });
-
-      // Hide all panels
-      tabDashboardContent.classList.add('hidden');
-      tabFormBuilderContent.classList.add('hidden');
-      tabLiveInterviewContent.classList.add('hidden');
-      tabClassAnalyticsContent.classList.add('hidden');
-
-      if (tabName === 'dashboard') {
-        navDashboard.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition bg-indigo-50 text-indigo-700";
-        tabDashboardContent.classList.remove('hidden');
-        renderTemplates();
-      } else if (tabName === 'form-builder') {
-        navFormBuilder.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition bg-indigo-50 text-indigo-700";
-        tabFormBuilderContent.classList.remove('hidden');
-        renderBuilderCriteria();
-      } else if (tabName === 'live-interview') {
-        navLiveInterview.className = "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition bg-rose-50 text-rose-700";
-        tabLiveInterviewContent.classList.remove('hidden');
-      } else if (tabName === 'class-analytics') {
-        navClassAnalytics.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition bg-indigo-50 text-indigo-700";
-        tabClassAnalyticsContent.classList.remove('hidden');
-        renderAnalytics();
-      }
-    };
-
-    navDashboard.addEventListener('click', () => switchTab('dashboard'));
-
-    // --- WORKSPACE LOGIC ---
-    workspaceForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (!user) {
-        wsErrorMsg.textContent = "Auth connection pending. Please wait...";
-        wsErrorMsg.classList.remove('hidden');
-        return;
-      }
-      
-      const wsName = wsNameInput.value.trim();
-      const wsPass = wsPassInput.value;
-      
-      if (!wsName || !wsPass) {
-        wsErrorMsg.textContent = "Please enter both name and password.";
-        wsErrorMsg.classList.remove('hidden');
-        return;
-      }
-
-      try {
-        const wsRef = doc(db, 'artifacts', app_id, 'workspaces', wsName);
-        const wsSnap = await getDoc(wsRef);
-        
-        if (wsSnap.exists()) {
-          // Verify password
-          if (wsSnap.data().password === wsPass) {
-            enterWorkspace(wsName);
-          } else {
-            wsErrorMsg.textContent = "Incorrect password for this workspace.";
-            wsErrorMsg.classList.remove('hidden');
-          }
-        } else {
-          // Create workspace
-          await setDoc(wsRef, {
-            password: wsPass,
-            createdAt: new Date().toISOString(),
-            createdBy: user.uid
-          });
-          enterWorkspace(wsName);
-        }
-      } catch (err) {
-        console.error(err);
-        wsErrorMsg.textContent = "Error: " + err.message;
-        wsErrorMsg.classList.remove('hidden');
-      }
-    });
-
-    const enterWorkspace = (wsName) => {
-      currentWorkspace = wsName;
-      workspaceOverlay.classList.add('hidden');
-      mainAppContainer.classList.remove('hidden');
-      headerWsBadge.textContent = `Workspace: ${wsName}`;
-      headerWsBadge.classList.remove('hidden');
-      
-      // Clear inputs
-      wsNameInput.value = '';
-      wsPassInput.value = '';
-      wsErrorMsg.classList.add('hidden');
-      
-      // Trigger sync for the new workspace
-      setupFirestoreSync();
-    };
-    
-    btnSwitchWs.addEventListener('click', () => {
-      currentWorkspace = null;
-      workspaceOverlay.classList.remove('hidden');
-      mainAppContainer.classList.add('hidden');
-      
-      if (unsubscribeTemplates) unsubscribeTemplates();
-      if (unsubscribeCandidates) unsubscribeCandidates();
-      
-      templates = [];
-      candidates = [];
-      renderTemplates();
-      renderAnalytics();
-    });
-    navFormBuilder.addEventListener('click', () => {
-      editingTemplateId = null;
-      document.getElementById('tpl-title').value = "Mock Interview Evaluation Standard Form";
-      document.getElementById('tpl-role').value = "General Candidate Profile";
-      document.getElementById('tpl-desc').value = "Standard rubrics matching strict professional criteria assessment.";
-      builderCriteria = [...MANDATORY_CRITERIA_DEFAULTS];
-      formBuilderHeaderTitle.textContent = "Create Custom Interview Evaluation Blueprint";
-      switchTab('form-builder');
-    });
-    navClassAnalytics.addEventListener('click', () => switchTab('class-analytics'));
-    navLiveInterview.addEventListener('click', () => switchTab('live-interview'));
-
-    // --- TIME UTILITIES ---
-    const padTime = (val) => val.toString().padStart(2, '0');
-    const getFormattedTime = (seconds) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${padTime(mins)}:${padTime(secs)}`;
-    };
-
-    // --- EVALUATION CALCULATIONS ---
-    const evaluateOverallPerformanceScore = (scores, rubrics, likerts) => {
-      if (!rubrics || rubrics.length === 0) return 0;
-      
-      let totalWeightedScore = 0;
-      let totalWeightUsed = 0;
-
-      rubrics.forEach(crit => {
-        const rating = scores[crit.id]; // 'NS', 'S', 'VS', 'NA'
-        if (rating && rating !== 'NA') {
-          let ratingPercentage = 0;
-          if (rating === 'VS') ratingPercentage = 100;
-          else if (rating === 'S') ratingPercentage = 66.6;
-          else if (rating === 'NS') ratingPercentage = 33.3;
-
-          const weight = Number(crit.weight || 0);
-          totalWeightedScore += ratingPercentage * (weight / 100);
-          totalWeightUsed += weight;
-        }
-      });
-
-      let criteriaFinalScore = 100;
-      if (totalWeightUsed > 0) {
-        criteriaFinalScore = (totalWeightedScore / totalWeightUsed) * 100;
-      }
-
-      let totalLikertScore = 0;
-      let likertsAnswered = 0;
-      Object.keys(likerts).forEach(key => {
-        const response = likerts[key];
-        if (response) {
-          likertsAnswered++;
-          if (response === 'Strongly Agree') totalLikertScore += 10;
-          else if (response === 'Agree') totalLikertScore += 7;
-          else if (response === 'Disagree') totalLikertScore += 3;
-        }
-      });
-
-      let likertFinalScore = 100;
-      if (likertsAnswered > 0) {
-        likertFinalScore = (totalLikertScore / (likertsAnswered * 10)) * 100;
-      }
-
-      // Combined metric: 60% standard evaluation rubrics & 40% overarching behavior indicators
-      const finalScore = (criteriaFinalScore * 0.6) + (likertFinalScore * 0.4);
-      return Math.round(finalScore * 10) / 10;
-    };
-
-    const getPerformerCategory = (score) => {
-      if (score >= scoreThresholds.high) return { label: 'Top Performer', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
-      if (score < scoreThresholds.low) return { label: 'Low Performer', color: 'bg-rose-100 text-rose-800 border-rose-300' };
-      return { label: 'Mid Performer', color: 'bg-amber-100 text-amber-800 border-amber-300' };
-    };
-
-    // --- REALTIME DYNAMIC RENDERING ---
-    
-    // 1. Render Blueprints / Templates
-    const renderTemplates = () => {
-      templatesGrid.innerHTML = '';
-      if (templates.length === 0) {
-        templatesGrid.innerHTML = `
-          <div class="bg-white rounded-xl border border-slate-200 p-12 text-center col-span-full">
-            <h3 class="text-md font-bold text-slate-800 mb-1">No blueprints loaded yet</h3>
-            <p class="text-sm text-slate-500 mb-4">Click below to automatically pre-populate the database with the standardized Image evaluation templates.</p>
-            <button id="btn-load-defaults-empty" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition shadow-xs">
-              Auto-Generate Standard Rubric Forms
-            </button>
-          </div>
-        `;
-        document.getElementById('btn-load-defaults-empty')?.addEventListener('click', handleLoadMockData);
-        return;
-      }
-
-      templates.forEach(tpl => {
-        const card = document.createElement('div');
-        card.className = "bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between";
-        
-        let criteriaListHtml = '';
-        if (tpl.criteria) {
-          tpl.criteria.forEach(c => {
-            criteriaListHtml += `
-              <div class="flex justify-between text-xs text-slate-600">
-                <span class="truncate max-w-[220px]">✓ ${c.name}</span>
-                <span class="text-slate-400 text-[10px] font-mono">Weight: ${c.weight}%</span>
-              </div>
-            `;
-          });
-        }
-
-        card.innerHTML = `
-          <div>
-            <div class="flex justify-between items-start mb-2">
-              <span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md text-[10px] font-bold uppercase">${tpl.role || 'Any Position'}</span>
-              <span class="text-xs text-slate-400">${tpl.criteria?.length || 0} Standards</span>
-            </div>
-            <h4 class="font-bold text-slate-900 text-md">${tpl.title}</h4>
-            <p class="text-xs text-slate-500 mt-1 line-clamp-2">${tpl.description}</p>
-            
-            <div class="mt-4 space-y-1">
-              <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Mandated Criteria Checklist</span>
-              ${criteriaListHtml}
-            </div>
-          </div>
-
-          <div class="border-t border-slate-100 pt-4 mt-6 flex justify-between items-center">
-            <div class="flex space-x-1">
-              <button class="btn-edit-tpl p-1.5 text-slate-500 hover:bg-slate-100 rounded" title="Edit template fields">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-              </button>
-              <button class="btn-delete-tpl p-1.5 text-rose-500 hover:bg-rose-50 rounded" title="Delete template">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-              </button>
-            </div>
-
-            <button class="btn-launch-interview bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg transition shadow-xs">
-              Launch Assessment Sheet
-            </button>
-          </div>
-        `;
-
-        // Action Bindings
-        card.querySelector('.btn-edit-tpl').addEventListener('click', () => {
-          triggerEditTemplate(tpl);
-        });
-        card.querySelector('.btn-delete-tpl').addEventListener('click', () => {
-          handleDeleteTemplate(tpl.id);
-        });
-        card.querySelector('.btn-launch-interview').addEventListener('click', () => {
-          handleStartInterview(tpl);
-        });
-
-        templatesGrid.appendChild(card);
-      });
-    };
-
-    // 2. Render Form Builder list rows
-    const renderBuilderCriteria = () => {
-      criteriaInputsContainer.innerHTML = '';
-      
-      builderCriteria.forEach((crit, index) => {
-        const row = document.createElement('div');
-        row.className = "p-3 bg-slate-50 border border-slate-200 rounded-lg relative flex flex-col gap-2";
-        row.innerHTML = `
-          <button type="button" class="btn-remove-builder-row absolute right-2 top-2 text-rose-500 hover:bg-rose-50 p-1 rounded" title="Remove item">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-          </button>
-
-          <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pr-6">
-            <div class="md:col-span-5">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase">Assessment Field Name</label>
-              <input type="text" class="row-crit-name w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:outline-none" value="${crit.name}" required>
-            </div>
-
-            <div class="md:col-span-3">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase">Category</label>
-              <select class="row-crit-cat w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:outline-none">
-                <option value="Communication" ${crit.category === 'Communication' ? 'selected' : ''}>Communication</option>
-                <option value="Fit" ${crit.category === 'Fit' ? 'selected' : ''}>Fit</option>
-                <option value="Professionalism" ${crit.category === 'Professionalism' ? 'selected' : ''}>Professionalism</option>
-                <option value="Background" ${crit.category === 'Background' ? 'selected' : ''}>Background</option>
-                <option value="Technical" ${crit.category === 'Technical' ? 'selected' : ''}>Technical</option>
-                <option value="Custom Skill" ${crit.category === 'Custom Skill' ? 'selected' : ''}>Custom Skill</option>
-              </select>
-            </div>
-
-            <div class="md:col-span-2">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase">Max (VS Value)</label>
-              <input type="number" class="w-full bg-slate-100 border border-slate-200 text-slate-500 rounded p-1.5 text-xs focus:outline-none" value="${crit.maxScore || 3}" readonly>
-            </div>
-
-            <div class="md:col-span-2">
-              <label class="block text-[10px] font-bold text-slate-400 uppercase">Weightage %</label>
-              <input type="number" min="1" max="100" class="row-crit-weight w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:outline-none" value="${crit.weight}" required>
-            </div>
-
-            <div class="md:col-span-12">
-              <input type="text" class="row-crit-desc w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:outline-none" placeholder="Define expectations / help prompts..." value="${crit.desc || ''}">
-            </div>
-          </div>
-        `;
-
-        // Event Listeners for local changes
-        row.querySelector('.row-crit-name').addEventListener('input', (e) => {
-          builderCriteria[index].name = e.target.value;
-        });
-        row.querySelector('.row-crit-cat').addEventListener('change', (e) => {
-          builderCriteria[index].category = e.target.value;
-        });
-        row.querySelector('.row-crit-weight').addEventListener('input', (e) => {
-          builderCriteria[index].weight = Number(e.target.value);
-          updateTotalWeightsIndicator();
-        });
-        row.querySelector('.row-crit-desc').addEventListener('input', (e) => {
-          builderCriteria[index].desc = e.target.value;
-        });
-        row.querySelector('.btn-remove-builder-row').addEventListener('click', () => {
-          builderCriteria.splice(index, 1);
-          renderBuilderCriteria();
-          updateTotalWeightsIndicator();
-        });
-
-        criteriaInputsContainer.appendChild(row);
-      });
-
-      updateTotalWeightsIndicator();
-    };
-
-    const updateTotalWeightsIndicator = () => {
-      const sum = builderCriteria.reduce((acc, c) => acc + Number(c.weight || 0), 0);
-      const indicator = document.getElementById('criteria-weight-indicator');
-      indicator.textContent = `${sum}%`;
-      if (sum === 100) {
-        indicator.className = 'text-emerald-600 font-extrabold';
-      } else {
-        indicator.className = 'text-amber-600 font-bold';
-      }
-    };
-
-    btnAddCriteria.addEventListener('click', () => {
-      builderCriteria.push({
-        id: `crit-${Date.now()}`,
-        name: '',
-        category: 'Custom Skill',
-        maxScore: 3,
-        weight: 10,
-        desc: ''
-      });
-      renderBuilderCriteria();
-    });
-
-    // 3. Render Active Live Interview Sheet based on chosen template
-    const renderLiveInterviewSheet = () => {
-      const criteriaContainer = document.getElementById('live-rating-criteria-container');
-      criteriaContainer.innerHTML = '';
-
-      if (!activeInterviewTemplate) return;
-
-      activeInterviewTemplate.criteria.forEach((c) => {
-        const row = document.createElement('div');
-        row.className = "p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-inner flex flex-col gap-3";
-        
-        row.innerHTML = `
-          <div class="flex flex-col sm:flex-row justify-between sm:items-start gap-2">
-            <div>
-              <h4 class="font-bold text-slate-900 text-xs">${c.name}</h4>
-              ${c.desc ? `<p class="text-[10px] text-slate-500 italic mt-0.5">${c.desc}</p>` : ''}
-            </div>
-            
-            <!-- Selector Buttons -->
-            <div class="flex space-x-1.5 self-start">
-              ${['NS', 'S', 'VS', 'NA'].map(rate => `
-                <button type="button" data-rate="${rate}" class="btn-score-select w-10 h-8 flex items-center justify-center rounded text-xs font-extrabold border transition ${
-                  candidateScores[c.id] === rate 
-                    ? getRateClass(rate) 
-                    : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'
-                }">
-                  ${rate}
+        </header>
+
+        <div class="flex flex-col gap-6 lg:flex-row">
+          <aside class="w-full lg:w-72 flex-shrink-0">
+            <nav class="space-y-3 rounded-3xl border border-slate-200/60 bg-white/90 p-5 shadow-xl backdrop-blur-xl">
+              <p class="text-xs uppercase tracking-[0.35em] text-slate-400">Main menu</p>
+              <button id="nav-dashboard" class="w-full flex items-center gap-3 rounded-3xl bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 transition">Evaluation Rubrics</button>
+              <button id="nav-form-builder" class="w-full flex items-center gap-3 rounded-3xl px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Customize Rubrics Form</button>
+              <button id="nav-class-analytics" class="w-full flex items-center gap-3 rounded-3xl px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Calibration & Analytics</button>
+              <div id="nav-active-assessment-container" class="hidden rounded-3xl border border-rose-100 bg-rose-50 p-4">
+                <p class="text-[10px] uppercase tracking-[0.3em] text-rose-500">● Active assessment</p>
+                <button id="nav-live-interview" class="mt-3 w-full rounded-3xl bg-white px-4 py-3 text-left text-sm font-semibold text-rose-700 transition hover:bg-rose-100">
+                  <div class="flex items-center justify-between gap-2">
+                    <span id="nav-active-candidate-name" class="truncate">Candidate Interview</span>
+                    <span id="live-timer" class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700"><span class="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></span><span class="live-duration-text">00:00</span></span>
+                  </div>
                 </button>
-              `).join('')}
+              </div>
+            </nav>
+          </aside>
+
+          <main class="flex-1 space-y-6">
+            <div id="toast-wrapper" class="hidden mb-4 rounded-3xl border p-4 shadow-xl transition-all">
+              <div class="flex items-center gap-3"><span class="text-lg">ℹ️</span><p id="toast-msg" class="text-sm font-medium"></p></div>
+              <button id="btn-toast-dismiss" class="text-xs font-bold uppercase opacity-70">Dismiss</button>
             </div>
-          </div>
 
-          <div>
-            <label class="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Specific comments to support your rating:</label>
-            <input type="text" class="input-comment w-full bg-white border border-slate-300 rounded p-1.5 text-xs focus:outline-none" placeholder="Add specific rating justifications here..." value="${candidateNotes[c.id] || ''}">
-          </div>
-        `;
+            <section id="tab-dashboard-content" class="space-y-6">
+              <div class="rounded-3xl bg-gradient-to-r from-indigo-700 to-indigo-900 p-6 text-white shadow-xl">
+                <h2 class="text-2xl font-bold tracking-tight">Your evaluation rubrics</h2>
+                <p class="mt-2 text-sm text-indigo-100 max-w-3xl">Build structured scorecards with 6 core criteria, Likert checklists, and calibrated scoring — then run live interviews from any template.</p>
+              </div>
 
-        // Event listener for comments
-        row.querySelector('.input-comment').addEventListener('input', (e) => {
-          candidateNotes[c.id] = e.target.value;
-        });
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 class="text-lg font-bold text-slate-900">Standardized Evaluation Templates</h3>
+                  <p class="text-xs text-slate-500">Pick a blueprint to initiate the live grading interface.</p>
+                </div>
+                <button onclick="switchTab('form-builder')" class="rounded-full bg-indigo-600 px-5 py-3 text-xs font-semibold text-white transition hover:bg-indigo-700">Create Custom Template</button>
+              </div>
 
-        // Event listeners for score selections
-        row.querySelectorAll('.btn-score-select').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const selectedRate = btn.getAttribute('data-rate');
-            candidateScores[c.id] = selectedRate;
-            
-            // Clean active sibling styles
-            row.querySelectorAll('.btn-score-select').forEach(sb => {
-              sb.className = "btn-score-select w-10 h-8 flex items-center justify-center rounded text-xs font-extrabold border transition bg-white text-slate-700 hover:bg-slate-100 border-slate-200";
-            });
-            
-            // Apply new style
-            btn.className = `btn-score-select w-10 h-8 flex items-center justify-center rounded text-xs font-extrabold border transition ${getRateClass(selectedRate)}`;
-            
-            updateLiveComputedScore();
-          });
-        });
+              <div id="templates-grid" class="grid gap-4 md:grid-cols-2"></div>
+            </section>
 
-        criteriaContainer.appendChild(row);
-      });
+            <section id="tab-form-builder-content" class="hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-xl space-y-6">
+              <div>
+                <h3 id="form-builder-header-title" class="text-xl font-bold text-slate-900">Create Custom Interview Evaluation Blueprint</h3>
+                <p class="text-xs text-slate-500 mt-1">Adjust default parameters. Standard questions are baked in by default.</p>
+              </div>
+              <form id="template-editor-form" class="space-y-4">
+                <div class="grid gap-4 md:grid-cols-3">
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-[0.3em] mb-1">Form Title *</label>
+                    <input type="text" id="tpl-title" required class="w-full rounded-3xl border border-slate-300 p-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Interview Evaluation Form" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-[0.3em] mb-1">Target Position Role</label>
+                    <input type="text" id="tpl-role" class="w-full rounded-3xl border border-slate-300 p-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="e.g. Software Developer" />
+                  </div>
+                  <div class="md:col-span-3">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-[0.3em] mb-1">Description</label>
+                    <textarea id="tpl-desc" rows="2" class="w-full rounded-3xl border border-slate-300 p-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" placeholder="Brief description of this evaluation form…"></textarea>
+                  </div>
+                </div>
 
-      // Render Likert Scales (Image 2 Checklist loop)
-      const likertContainer = document.getElementById('live-likert-questions-container');
-      likertContainer.innerHTML = '';
+                <div class="rounded-3xl border border-slate-100 p-4">
+                  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <div>
+                      <h4 class="font-bold text-slate-900 text-sm">Review Rating Criteria Checklist</h4>
+                      <p class="text-[10px] text-slate-500">Every criteria includes NS, S, VS options.</p>
+                    </div>
+                    <button type="button" id="btn-add-criteria" class="rounded-full bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100">+ Add Custom Element</button>
+                  </div>
+                  <div id="criteria-inputs-container" class="space-y-3"></div>
+                  <div class="mt-4 rounded-3xl bg-slate-100 p-3 text-xs font-semibold text-slate-700 flex items-center justify-between">
+                    <span>Overall Criteria Section Weight:</span>
+                    <span id="criteria-weight-indicator" class="text-emerald-600">100%</span>
+                  </div>
+                </div>
 
-      MANDATORY_LIKERT_QUESTIONS.forEach((q, idx) => {
-        const block = document.createElement('div');
-        block.className = "p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2";
-        
-        block.innerHTML = `
-          <p class="text-xs font-bold text-slate-800">${idx + 1}. ${q.text}</p>
-          
-          <div class="flex flex-wrap gap-2 pt-1">
-            ${['Strongly Agree', 'Agree', 'Disagree', 'Could not determine'].map(choice => `
-              <button type="button" data-choice="${choice}" class="btn-likert-choice px-3 py-1.5 text-xs rounded-full border font-medium transition ${
-                likertResponses[q.id] === choice 
-                  ? getLikertClass(choice) 
-                  : 'bg-white border-slate-200 hover:bg-slate-100 text-slate-600'
-              }">
-                ${choice}
-              </button>
-            `).join('')}
-          </div>
-        `;
+                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">
+                  <button type="button" onclick="switchTab('dashboard')" class="rounded-full border border-slate-300 px-5 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-50">Back to Blueprints</button>
+                  <button type="submit" class="rounded-full bg-indigo-600 px-6 py-3 text-xs font-bold text-white hover:bg-indigo-700">Publish Standards Form</button>
+                </div>
+              </form>
+            </section>
 
-        // Event binding
-        block.querySelectorAll('.btn-likert-choice').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const selectedChoice = btn.getAttribute('data-choice');
-            likertResponses[q.id] = selectedChoice;
+            <section id="tab-live-interview-content" class="hidden grid gap-6 lg:grid-cols-12">
+              <form id="live-interview-form" class="lg:col-span-8 space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+                <div class="border-b border-slate-200 pb-4">
+                  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 class="text-xl font-black text-slate-900 uppercase tracking-tight">Live Interview Evaluation</h3>
+                      <p class="text-xs text-slate-400 mt-1">Check relevant boxes and add constructive notes for calibration.</p>
+                    </div>
+                    <div class="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
+                      <span class="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></span>
+                      <span class="font-mono live-duration-text">00:00</span>
+                    </div>
+                  </div>
+                </div>
 
-            block.querySelectorAll('.btn-likert-choice').forEach(sb => {
-              sb.className = "btn-likert-choice px-3 py-1.5 text-xs rounded-full border font-medium transition bg-white border-slate-200 hover:bg-slate-100 text-slate-600";
-            });
+                <div class="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Name of Candidate *</label>
+                    <input type="text" id="candidate-name" required class="w-full rounded-3xl border border-slate-300 p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Liam Henderson" />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Position Title</label>
+                    <input type="text" id="candidate-role" class="w-full rounded-3xl border border-slate-300 p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Software Developer" />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Interviewer(s)</label>
+                    <input type="text" id="interviewer-name" class="w-full rounded-3xl border border-slate-300 p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Alex Mercer" />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Date of Interview</label>
+                    <input type="date" id="date-of-interview" class="w-full rounded-3xl border border-slate-300 p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" />
+                  </div>
+                </div>
 
-            btn.className = `btn-likert-choice px-3 py-1.5 text-xs rounded-full border font-medium transition ${getLikertClass(selectedChoice)}`;
-            updateLiveComputedScore();
-          });
-        });
+                <div class="space-y-4 border-t border-slate-100 pt-6">
+                  <div class="rounded-3xl bg-slate-900 p-4 text-white">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span class="text-xs font-bold uppercase tracking-[0.3em]">Image 1: Rating Criteria Rubrics</span>
+                      <span class="text-[10px] text-slate-300">NS = Not Satisfactory · S = Satisfactory · VS = Very Satisfactory · NA = Not Applicable</span>
+                    </div>
+                  </div>
+                  <div id="live-rating-criteria-container" class="space-y-4"></div>
+                </div>
 
-        likertContainer.appendChild(block);
-      });
+                <div class="space-y-4 border-t border-slate-200 pt-6">
+                  <div class="rounded-3xl bg-indigo-900 p-4 text-white text-sm font-semibold uppercase tracking-[0.2em]">Image 2: Feedback & Evaluation Checklist</div>
+                  <div id="live-likert-questions-container" class="space-y-4"></div>
+                </div>
 
-      updateLiveComputedScore();
-    };
+                <div class="space-y-4 border-t border-slate-200 pt-6">
+                  <h4 class="font-bold text-slate-900 text-sm">Qualitative Summary Assessment</h4>
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label class="block text-xs font-bold text-slate-700 mb-1">Candidate's Strengths:</label>
+                      <textarea id="candidate-strengths" rows="3" class="w-full rounded-3xl border border-slate-300 p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Write down core positives observed..."></textarea>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-slate-700 mb-1">Candidate's Weaknesses:</label>
+                      <textarea id="candidate-weaknesses" rows="3" class="w-full rounded-3xl border border-slate-300 p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Detail any limitations or friction points..."></textarea>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Overall Verdict / Additional Comments:</label>
+                    <textarea id="overall-feedback" rows="3" class="w-full rounded-3xl border border-slate-300 p-3 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Combine decision statements or other notes..."></textarea>
+                  </div>
+                  <div class="rounded-3xl bg-indigo-50 border border-indigo-200 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs">
+                    <div>
+                      <span class="font-bold text-indigo-900 block">Real-Time Calibration Outcome:</span>
+                      <span class="text-slate-500">Auto-weighted score based on criteria metrics and checklist evaluations.</span>
+                    </div>
+                    <span id="live-computed-score-badge" class="rounded-full bg-indigo-600 px-4 py-2 text-sm font-black text-white">0%</span>
+                  </div>
+                </div>
 
-    const getRateClass = (rate) => {
-      if (rate === 'VS') return 'bg-emerald-600 text-white border-emerald-700 shadow-sm';
-      if (rate === 'S') return 'bg-indigo-600 text-white border-indigo-700 shadow-sm';
-      if (rate === 'NS') return 'bg-rose-600 text-white border-rose-700 shadow-sm';
-      return 'bg-slate-700 text-white border-slate-800';
-    };
+                <div class="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">
+                  <button type="button" id="btn-cancel-interview" class="rounded-full border border-rose-200 px-5 py-3 text-xs font-semibold text-rose-600 hover:bg-rose-50">Cancel Interview</button>
+                  <button type="submit" class="rounded-full bg-emerald-600 px-6 py-3 text-xs font-bold text-white hover:bg-emerald-700">Complete & Save Calibration</button>
+                </div>
+              </form>
 
-    const getLikertClass = (choice) => {
-      if (choice === 'Strongly Agree') return 'bg-emerald-100 border-emerald-500 text-emerald-800 font-bold';
-      if (choice === 'Agree') return 'bg-indigo-100 border-indigo-500 text-indigo-800 font-bold';
-      if (choice === 'Disagree') return 'bg-rose-100 border-rose-500 text-rose-800 font-bold';
-      return 'bg-slate-200 border-slate-500 text-slate-800 font-bold';
-    };
+              <div class="lg:col-span-4 space-y-4">
+                <div class="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-xl sticky top-24">
+                  <h4 class="font-bold text-amber-900 text-xs uppercase mb-2">💡 Quick Evaluator Notepad</h4>
+                  <p class="text-[11px] text-amber-700 mb-4">Scribble quick bullet points. This area is isolated for your local workspace.</p>
+                  <textarea id="local-scratchpad" rows="12" class="w-full rounded-3xl border border-amber-200 bg-white p-3 text-xs font-mono focus:outline-none" placeholder="Jot quick notes here — only visible on your screen during this session."></textarea>
+                  <div class="mt-4 rounded-3xl border border-amber-200 bg-amber-100 p-4 text-[10px] text-amber-800">
+                    <span class="font-bold uppercase tracking-[0.2em]">Calibration Matrix Tips</span>
+                    <ul class="mt-3 space-y-2 list-disc pl-4">
+                      <li>Use <strong>VS</strong> for fully autonomous output capability.</li>
+                      <li>Use <strong>NS</strong> for critical issues and explain detail.</li>
+                      <li>Checklist loops dynamically weigh into overall distribution.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-    const updateLiveComputedScore = () => {
-      const score = evaluateOverallPerformanceScore(candidateScores, activeInterviewTemplate.criteria, likertResponses);
-      document.getElementById('live-computed-score-badge').textContent = `${score}%`;
-    };
+            <section id="tab-class-analytics-content" class="hidden space-y-6">
+              <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl space-y-4">
+                <div>
+                  <h3 class="font-bold text-slate-900">Class Performance Cutoffs</h3>
+                  <p class="text-xs text-slate-500">Tune grading thresholds to sort candidates into Top, Mid, and Low performance categories.</p>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-[0.3em] mb-2">Top Performer Minimum Threshold (≥ %)</label>
+                    <div class="flex items-center gap-3">
+                      <input type="range" id="cutoff-high" min="60" max="95" step="1" value="80" class="w-full accent-emerald-600" />
+                      <span id="label-cutoff-high" class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">80%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-[0.3em] mb-2">Low Performer Limit (< %)</label>
+                    <div class="flex items-center gap-3">
+                      <input type="range" id="cutoff-low" min="30" max="65" step="1" value="50" class="w-full accent-rose-600" />
+                      <span id="label-cutoff-low" class="rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800">50%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-    // 4. Render Calibration and Analytics Dashboard
-    const renderAnalytics = () => {
-      // Filter roles dropdown population
-      const uniqueRoles = ['All', ...new Set(candidates.map(c => c.role).filter(Boolean))];
-      analyticsRoleFilter.innerHTML = '';
-      uniqueRoles.forEach(r => {
-        analyticsRoleFilter.innerHTML += `<option value="${r}" ${filterRole === r ? 'selected' : ''}>${r}</option>`;
-      });
+              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
+                <h4 class="font-bold text-slate-900">Active Evaluated Candidate Distribution</h4>
+                <div id="distribution-chart-wrapper"></div>
+              </div>
 
-      // Filter local list
-      const filtered = candidates.filter(cand => {
-        const matchesRole = filterRole === 'All' || cand.role === filterRole;
-        const matchesSearch = cand.name.toLowerCase().includes(filterQuery.toLowerCase()) || 
-                              cand.interviewer.toLowerCase().includes(filterQuery.toLowerCase()) ||
-                              cand.templateTitle.toLowerCase().includes(filterQuery.toLowerCase());
-        return matchesRole && matchesSearch;
-      });
-
-      // Group Performance arrays
-      const topT = filtered.filter(c => c.calculatedScore >= scoreThresholds.high);
-      const midT = filtered.filter(c => c.calculatedScore >= scoreThresholds.low && c.calculatedScore < scoreThresholds.high);
-      const lowT = filtered.filter(c => c.calculatedScore < scoreThresholds.low);
-
-      // Render Visual Distribution Bar
-      renderDistributionChart(filtered, topT, midT, lowT);
-
-      // Render Calibration Matrix Table
-      candidatesTableBody.innerHTML = '';
-      if (filtered.length === 0) {
-        candidatesTableBody.innerHTML = `<tr><td colspan="7" class="p-12 text-center text-xs text-slate-400">No matching search entries found.</td></tr>`;
-        return;
-      }
-
-      filtered.forEach(cand => {
-        const category = getPerformerCategory(cand.calculatedScore);
-        const row = document.createElement('tr');
-        row.className = "hover:bg-slate-50 transition border-b border-slate-100";
-        
-        row.innerHTML = `
-          <td class="p-4">
-            <span class="font-bold text-slate-900 block">${cand.name}</span>
-            <span class="text-[10px] text-slate-400">${cand.role}</span>
-          </td>
-          <td class="p-4">
-            <span class="font-medium text-slate-800 block">${cand.interviewer}</span>
-            <span class="text-[10px] text-slate-400">${cand.date || 'No Date'}</span>
-          </td>
-          <td class="p-4 font-mono font-black text-slate-950 text-sm">
-            ${cand.calculatedScore}%
-          </td>
-          <td class="p-4">
-            <span class="inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold ${category.color}">
-              ${category.label}
-            </span>
-          </td>
-          <td class="p-4 max-w-[150px] truncate" title="${cand.strengths || '-'}">
-            ${cand.strengths || '-'}
-          </td>
-          <td class="p-4 max-w-[150px] truncate" title="${cand.weaknesses || '-'}">
-            ${cand.weaknesses || '-'}
-          </td>
-          <td class="p-4 text-right space-x-1 whitespace-nowrap">
-            <button class="btn-copy-report p-1 bg-slate-50 text-slate-600 rounded hover:bg-slate-100 inline-block" title="Copy scorecard report to clipboard">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-            </button>
-            <button class="btn-delete-cand p-1 bg-rose-50 text-rose-600 rounded hover:bg-rose-100 inline-block" title="Remove Evaluation permanently">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-            </button>
-          </td>
-        `;
-
-        row.querySelector('.btn-copy-report').addEventListener('click', () => {
-          const text = `Candidate Report: ${cand.name}\nOverall Grade: ${cand.calculatedScore}%\nVerdict: ${category.label}\nStrengths: ${cand.strengths}\nWeaknesses: ${cand.weaknesses}\nAdditional Comments: ${cand.overallFeedback}`;
-          navigator.clipboard?.writeText ? navigator.clipboard.writeText(text) : document.execCommand('copy');
-          showToast("Detailed scorecard report copied to clipboard!");
-        });
-
-        row.querySelector('.btn-delete-cand').addEventListener('click', () => {
-          handleDeleteCandidate(cand.id);
-        });
-
-        candidatesTableBody.appendChild(row);
-      });
-    };
-
-    const renderDistributionChart = (filteredList, topT, midT, lowT) => {
-      distributionChartWrapper.innerHTML = '';
-      if (filteredList.length === 0) {
-        distributionChartWrapper.innerHTML = `<p class="text-xs text-slate-400 py-4 text-center">No calibrated candidates found inside the directory database.</p>`;
-        return;
-      }
-
-      const total = filteredList.length;
-      const topPct = Math.round((topT.length / total) * 100);
-      const midPct = Math.round((midT.length / total) * 100);
-      const lowPct = Math.round((lowT.length / total) * 100);
-
-      distributionChartWrapper.innerHTML = `
-        <div class="h-8 w-full bg-slate-100 rounded-lg overflow-hidden flex mb-4">
-          ${topT.length > 0 ? `<div style="width: ${topPct}%" class="bg-emerald-500 text-white font-extrabold text-[10px] flex items-center justify-center transition-all">Top: ${topPct}%</div>` : ''}
-          ${midT.length > 0 ? `<div style="width: ${midPct}%" class="bg-amber-500 text-white font-extrabold text-[10px] flex items-center justify-center transition-all">Mid: ${midPct}%</div>` : ''}
-          ${lowT.length > 0 ? `<div style="width: ${lowPct}%" class="bg-rose-500 text-white font-extrabold text-[10px] flex items-center justify-center transition-all">Low: ${lowPct}%</div>` : ''}
+              <div class="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xl">
+                <div class="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-sm">Class Calibration Matrix Table</h4>
+                    <p class="text-[10px] text-slate-400">Search by candidate names or interviewer keywords.</p>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div class="relative">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                      <input type="text" id="analytics-search" class="w-44 rounded-full border border-slate-300 bg-white pl-10 pr-3 py-2 text-xs focus:outline-none" placeholder="Search candidates…" />
+                    </div>
+                    <select id="analytics-role-filter" class="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-none">
+                      <option value="All">All Roles</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-100 text-[10px] uppercase font-bold text-slate-500">
+                      <tr>
+                        <th class="p-4">Candidate</th>
+                        <th class="p-4">Assessed By</th>
+                        <th class="p-4">Final Score</th>
+                        <th class="p-4">Grading Category</th>
+                        <th class="p-4">Key Strengths</th>
+                        <th class="p-4">Key Weaknesses</th>
+                        <th class="p-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="candidates-table-body" class="divide-y divide-slate-100"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          </main>
         </div>
+      </div>
+    </section>
+    </div>
+  </main>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-          <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-bold">
-            <span>⭐ Top tier (${topT.length} candidates)</span>
-          </div>
-          <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs font-bold">
-            <span>⚖️ Mid tier (${midT.length} candidates)</span>
-          </div>
-          <div class="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs font-bold">
-            <span>⚠️ Low tier (${lowT.length} candidates)</span>
-          </div>
-        </div>
-      `;
-    };
+  <footer id="login-footer" class="login-footer relative z-10 py-6 text-center text-xs text-slate-400">
+    <p>TalentCalibrate · Interview evaluation platform</p>
+  </footer>
 
-    // --- TEMPLATE EDIT / DELETE INTERACTION HANDLERS ---
-    const triggerEditTemplate = (template) => {
-      editingTemplateId = template.id;
-      document.getElementById('tpl-title').value = template.title;
-      document.getElementById('tpl-role').value = template.role || '';
-      document.getElementById('tpl-desc').value = template.description || '';
-      builderCriteria = template.criteria || [...MANDATORY_CRITERIA_DEFAULTS];
-      formBuilderHeaderTitle.textContent = "Configure Existing Form Rubrics";
-      switchTab('form-builder');
-    };
-
-    const handleDeleteTemplate = async (id) => {
-      if (window.confirm("Delete this form template permanently?")) {
-        try {
-          await deleteDoc(doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates', id));
-          showToast('Template removed successfully.');
-        } catch (err) {
-          showToast('Deletion error.', 'error');
-        }
-      }
-    };
-
-    // --- FORM TEMPLATE PUBLISH SUBMIT ---
-    templateEditorForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (!user) {
-        showToast('Syncing auth session, please wait.', 'error');
-        return;
-      }
-
-      const templateData = {
-        title: document.getElementById('tpl-title').value,
-        description: document.getElementById('tpl-desc').value,
-        role: document.getElementById('tpl-role').value,
-        criteria: builderCriteria,
-        updatedAt: new Date().toISOString(),
-        creator: user?.uid || 'anonymous'
-      };
-
-      try {
-        if (editingTemplateId) {
-          const docRef = doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates', editingTemplateId);
-          await updateDoc(docRef, templateData);
-          showToast('Rubric form template updated successfully!');
-        } else {
-          const collectionRef = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
-          await addDoc(collectionRef, templateData);
-          showToast('Dynamic form template published!');
-        }
-
-        switchTab('dashboard');
-      } catch (err) {
-        console.error(err);
-        showToast('Failed to save templates.', 'error');
-      }
-    });
-
-    // --- LIVE INTERVIEW TRIGGERS & FORM CONTROL ---
-    const handleStartInterview = (template) => {
-      activeInterviewTemplate = template;
-      
-      // Clean candidate fields
-      document.getElementById('candidate-name').value = '';
-      document.getElementById('candidate-role').value = template.role || '';
-      document.getElementById('interviewer-name').value = '';
-      document.getElementById('date-of-interview').value = new Date().toISOString().split('T')[0];
-
-      candidateScores = {};
-      candidateNotes = {};
-      template.criteria.forEach(c => {
-        candidateScores[c.id] = 'S'; // Default standard score
-        candidateNotes[c.id] = '';
-      });
-
-      likertResponses = {
-        'likert-1': 'Agree',
-        'likert-2': 'Agree',
-        'likert-3': 'Agree',
-        'likert-4': 'Agree',
-        'likert-5': 'Agree',
-        'likert-6': 'Agree'
-      };
-
-      document.getElementById('candidate-strengths').value = '';
-      document.getElementById('candidate-weaknesses').value = '';
-      document.getElementById('overall-feedback').value = '';
-
-      // Start live timer
-      interviewDuration = 0;
-      clearInterval(timerInterval);
-      timerInterval = setInterval(() => {
-        interviewDuration++;
-        const formatted = getFormattedTime(interviewDuration);
-        liveTimerLabel.textContent = formatted;
-        document.querySelectorAll('.live-duration-text').forEach(el => el.textContent = formatted);
-      }, 1000);
-
-      navActiveCandidateName.textContent = "Candidate Interview";
-      navActiveAssessmentContainer.classList.remove('hidden');
-
-      renderLiveInterviewSheet();
-      switchTab('live-interview');
-    };
-
-    document.getElementById('candidate-name').addEventListener('input', (e) => {
-      const name = e.target.value;
-      navActiveCandidateName.textContent = name ? name : "Candidate Interview";
-    });
-
-    // Cancel active interview
-    document.getElementById('btn-cancel-interview').addEventListener('click', () => {
-      if (window.confirm("Abandon current assessment? This wipes live evaluations.")) {
-        cleanupActiveInterview();
-      }
-    });
-
-    const cleanupActiveInterview = () => {
-      clearInterval(timerInterval);
-      activeInterviewTemplate = null;
-      navActiveAssessmentContainer.classList.add('hidden');
-      switchTab('dashboard');
-    };
-
-    // Save Active Assessment Calibration
-    document.getElementById('live-interview-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (!user) {
-        showToast('Connection pending. Please try again in a few moments.', 'error');
-        return;
-      }
-
-      const calculatedScore = evaluateOverallPerformanceScore(candidateScores, activeInterviewTemplate.criteria, likertResponses);
-      
-      const candidateData = {
-        name: document.getElementById('candidate-name').value,
-        role: document.getElementById('candidate-role').value || activeInterviewTemplate.role || 'General Profile',
-        interviewer: document.getElementById('interviewer-name').value || 'Anonymous Interviewer',
-        date: document.getElementById('date-of-interview').value,
-        templateTitle: activeInterviewTemplate.title,
-        scores: candidateScores,
-        notes: candidateNotes,
-        likertAnswers: likertResponses,
-        strengths: document.getElementById('candidate-strengths').value,
-        weaknesses: document.getElementById('candidate-weaknesses').value,
-        overallFeedback: document.getElementById('overall-feedback').value,
-        durationSeconds: interviewDuration,
-        calculatedScore: calculatedScore,
-        evaluatedAt: new Date().toISOString()
-      };
-
-      try {
-        const candidatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
-        await addDoc(candidatesCollection, candidateData);
-        showToast(`${candidateData.name} evaluated and calibrated successfully!`);
-        cleanupActiveInterview();
-        switchTab('class-analytics');
-      } catch (err) {
-        console.error(err);
-        showToast('Error saving candidate evaluation.', 'error');
-      }
-    });
-
-    const handleDeleteCandidate = async (id) => {
-      if (window.confirm("Remove candidate trial evaluation report permanently?")) {
-        try {
-          await deleteDoc(doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates', id));
-          showToast('Evaluation report deleted.');
-        } catch (err) {
-          showToast('Could not delete report.', 'error');
-        }
-      }
-    };
-
-    // --- ANALYTICS FILTERS / SLIDERS EVENTS ---
-    cutoffHighSlider.addEventListener('input', (e) => {
-      scoreThresholds.high = Number(e.target.value);
-      labelCutoffHigh.textContent = `${scoreThresholds.high}%`;
-      renderAnalytics();
-    });
-
-    cutoffLowSlider.addEventListener('input', (e) => {
-      scoreThresholds.low = Number(e.target.value);
-      labelCutoffLow.textContent = `${scoreThresholds.low}%`;
-      renderAnalytics();
-    });
-
-    analyticsSearch.addEventListener('input', (e) => {
-      filterQuery = e.target.value;
-      renderAnalytics();
-    });
-
-    analyticsRoleFilter.addEventListener('change', (e) => {
-      filterRole = e.target.value;
-      renderAnalytics();
-    });
-
-    // --- OFFICIAL INITIAL DEFAULTS POPULATION ---
-    const handleLoadMockData = async () => {
-      if (!user) return;
-      
-      try {
-        // 1. Create standard form template
-        const templateCollectionRef = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
-        const defaultForm = {
-          title: "Standard Mock Interview Evaluation Form",
-          description: "Official structured rubric containing both Image 1 and Image 2 standards: NS/S/VS checklist ratings, Likert indicator checklists, Strengths/Weaknesses fields, and overall calibration metric outputs.",
-          role: "Software Developer Candidate",
-          criteria: [...MANDATORY_CRITERIA_DEFAULTS],
-          updatedAt: new Date().toISOString(),
-          creator: 'system'
-        };
-        const createdTpl = await addDoc(templateCollectionRef, defaultForm);
-
-        // 2. Create mock candidates evaluated on this standard
-        const candidatesCollectionRef = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
-        const mockCandidates = [
-          {
-            name: "Rohan Varma",
-            role: "Software Developer Candidate",
-            interviewer: "Mr. Alex Mercer",
-            date: new Date(Date.now() - 3600000 * 24).toISOString().split('T')[0],
-            templateTitle: "Standard Mock Interview Evaluation Form",
-            scores: {
-              'crit-comm-verbal': 'VS', 'crit-comm-nonverbal': 'VS',
-              'crit-interest': 'S', 'crit-presentation': 'VS',
-              'crit-resume': 'S', 'crit-problem-solving': 'VS'
-            },
-            notes: {
-              'crit-comm-verbal': 'Spoke cleanly and persuasively.',
-              'crit-problem-solving': 'Solved the architectural database optimization cleanly.'
-            },
-            likertAnswers: {
-              'likert-1': 'Strongly Agree', 'likert-2': 'Strongly Agree',
-              'likert-3': 'Agree', 'likert-4': 'Strongly Agree',
-              'likert-5': 'Strongly Agree', 'likert-6': 'Strongly Agree'
-            },
-            strengths: "Outstanding problem solving, rapid delivery of clean algorithms under pressure, and crisp verbal presentation.",
-            weaknesses: "Slightly passive on asking about internal corporate culture segments.",
-            overallFeedback: "Stellar performance overall, highly recommended. Possesses precise skills matched for the team leader position.",
-            durationSeconds: 2450,
-            calculatedScore: 92.5,
-            evaluatedAt: new Date().toISOString()
-          },
-          {
-            name: "Simran Kaur",
-            role: "Software Developer Candidate",
-            interviewer: "Ms. Elena Rostova",
-            date: new Date().toISOString().split('T')[0],
-            templateTitle: "Standard Mock Interview Evaluation Form",
-            scores: {
-              'crit-comm-verbal': 'S', 'crit-comm-nonverbal': 'S',
-              'crit-interest': 'NS', 'crit-presentation': 'S',
-              'crit-resume': 'S', 'crit-problem-solving': 'S'
-            },
-            notes: {
-              'crit-interest': 'Had low awareness about current product lines.'
-            },
-            likertAnswers: {
-              'likert-1': 'Agree', 'likert-2': 'Disagree',
-              'likert-3': 'Agree', 'likert-4': 'Agree',
-              'likert-5': 'Agree', 'likert-6': 'Agree'
-            },
-            strengths: "Has valid technical baseline, comfortable with medium difficulty coding questions.",
-            weaknesses: "Lacks core organization context and product excitement.",
-            overallFeedback: "Good solid developer, but requires excitement calibration and background review.",
-            durationSeconds: 1800,
-            calculatedScore: 65.0,
-            evaluatedAt: new Date().toISOString()
-          },
-          {
-            name: "Daniel Craig",
-            role: "Software Developer Candidate",
-            interviewer: "Mr. Alex Mercer",
-            date: new Date(Date.now() - 3600000 * 48).toISOString().split('T')[0],
-            templateTitle: "Standard Mock Interview Evaluation Form",
-            scores: {
-              'crit-comm-verbal': 'NS', 'crit-comm-nonverbal': 'NS',
-              'crit-interest': 'NS', 'crit-presentation': 'NS',
-              'crit-resume': 'NS', 'crit-problem-solving': 'NS'
-            },
-            notes: {
-              'crit-problem-solving': 'Could not outline high scale layout requirements.'
-            },
-            likertAnswers: {
-              'likert-1': 'Disagree', 'likert-2': 'Disagree',
-              'likert-3': 'Disagree', 'likert-4': 'Could not determine',
-              'likert-5': 'Disagree', 'likert-6': 'Disagree'
-            },
-            strengths: "Average theoretical definitions.",
-            weaknesses: "Significant gaps in coding execution, high level design, and professional etiquette.",
-            overallFeedback: "Does not meet the baseline criteria for position title. Significant remediation recommended.",
-            durationSeconds: 1550,
-            calculatedScore: 32.0,
-            evaluatedAt: new Date().toISOString()
-          }
-        ];
-
-        for (const cand of mockCandidates) {
-          await addDoc(candidatesCollectionRef, cand);
-        }
-        showToast('Standard Mock Evaluation Template & Candidates populated successfully!');
-      } catch (err) {
-        console.error(err);
-        showToast('Error populating defaults.', 'error');
-      }
-    };
-
-    btnMockLoader.addEventListener('click', handleLoadMockData);
-
-    // --- AUTH FLOW ---
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Auth initialization failure: ", err);
-        showToast("Connected in offline preview status. Data is temporary.", "info");
-        user = { uid: 'anonymous-local-dev-user' };
-        authStatusLabel.textContent = "Offline Status";
-        setupFirestoreSync();
-      }
-    };
-
-    initAuth();
-
-    onAuthStateChanged(auth, (u) => {
-      if (u) {
-        user = u;
-        authStatusLabel.textContent = "Database Active";
-        btnMockLoader.classList.remove('hidden');
-        setupFirestoreSync();
-      } else {
-        user = null;
-        authStatusLabel.textContent = "Unauthenticated";
-      }
-    });
-
-    let unsubscribeTemplates = null;
-    let unsubscribeCandidates = null;
-    
-    // --- REALTIME SYNC TRIGGER ---
-    const setupFirestoreSync = () => {
-      if (!currentWorkspace) return;
-
-      const templatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'templates');
-      const candidatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
-
-      if (unsubscribeTemplates) unsubscribeTemplates();
-      if (unsubscribeCandidates) unsubscribeCandidates();
-
-      unsubscribeTemplates = onSnapshot(templatesCollection, (snapshot) => {
-        templates = [];
-        snapshot.forEach((doc) => {
-          templates.push({ id: doc.id, ...doc.data() });
-        });
-        renderTemplates();
-      }, (error) => {
-        console.error("Templates snapshot fetch error:", error);
-      });
-
-      unsubscribeCandidates = onSnapshot(candidatesCollection, (snapshot) => {
-        candidates = [];
-        snapshot.forEach((doc) => {
-          candidates.push({ id: doc.id, ...doc.data() });
-        });
-        renderAnalytics();
-      }, (error) => {
-        console.error("Candidates snapshot fetch error:", error);
-      });
-    };
-
-  </script>
+  <script src="app.js" type="module" defer></script>
 </body>
 </html>
