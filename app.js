@@ -1814,39 +1814,65 @@ const renderLiveInterviewSheet = () => {
   criteriaContainer.innerHTML = '';
   if (!activeInterviewTemplate) return;
 
-  activeInterviewTemplate.criteria.forEach((c) => {
+  activeInterviewTemplate.criteria.forEach((c, idx) => {
     const row = document.createElement('div');
-    row.className = 'p-4 bg-slate-50 rounded-3xl border border-slate-200 shadow-inner flex flex-col gap-4';
+    row.className = 'criteria-card';
     row.innerHTML = `
-      <div class="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
-        <div>
-          <h4 class="font-bold text-slate-900 text-xs">${c.name}</h4>
-          ${c.desc ? `<p class="text-[10px] text-slate-500 italic mt-1">${c.desc}</p>` : ''}
+      <div class="criteria-card__header">
+        <div class="criteria-card__meta">
+          <span class="criteria-card__num">${idx + 1}</span>
+          <div>
+            <div class="criteria-card__title">${c.name}</div>
+            ${c.desc ? `<div class="criteria-card__desc">${c.desc}</div>` : ''}
+          </div>
         </div>
-        <div class="flex gap-2 flex-wrap">
-          ${['NS', 'S', 'VS', 'NA'].map((rate) => `
-            <button type="button" data-rate="${rate}" class="btn-score-select w-11 h-9 rounded-full text-xs font-extrabold border transition ${candidateScores[c.id] === rate ? getRateClass(rate) : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}">${rate}</button>
+        ${c.category ? `<span class="criteria-card__category">${c.category}</span>` : ''}
+      </div>
+
+      <div class="criteria-card__ratings">
+        <span class="criteria-card__ratings-label">Rating</span>
+        <div class="rating-btn-group">
+          ${[
+            { rate: 'NS', label: 'Not Satisfactory', icon: '✕' },
+            { rate: 'S',  label: 'Satisfactory',     icon: '~' },
+            { rate: 'VS', label: 'Very Satisfactory', icon: '✓' },
+            { rate: 'NA', label: 'Not Applicable',    icon: '—' }
+          ].map(({ rate, label, icon }) => `
+            <button type="button" data-rate="${rate}"
+              class="rating-btn rating-btn--${rate.toLowerCase()} ${candidateScores[c.id] === rate ? 'is-selected' : ''}"
+              title="${label}" aria-label="${label}">
+              <span class="rating-btn__abbr">${rate}</span>
+              <span class="rating-btn__icon" aria-hidden="true">${icon}</span>
+            </button>
           `).join('')}
         </div>
       </div>
-      <div>
-        <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Specific comments to support your rating:</label>
-        <input type="text" class="input-comment w-full bg-white border border-slate-300 rounded-2xl p-3 text-xs focus:outline-none" placeholder="Add specific rating justifications here..." value="${candidateNotes[c.id] || ''}">
+
+      <div class="criteria-card__note">
+        <label class="criteria-note-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Comments to support this rating
+        </label>
+        <input type="text" class="input-comment criteria-note-input"
+          placeholder="Describe what you observed…"
+          value="${candidateNotes[c.id] || ''}">
       </div>
     `;
 
-    row.querySelector('.input-comment').addEventListener('input', (e) => { candidateNotes[c.id] = e.target.value; });
-    row.querySelectorAll('.btn-score-select').forEach((btn) => {
+    row.querySelector('.criteria-note-input').addEventListener('input', (e) => {
+      candidateNotes[c.id] = e.target.value;
+    });
+
+    row.querySelectorAll('.rating-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const selectedRate = btn.getAttribute('data-rate');
         candidateScores[c.id] = selectedRate;
-        row.querySelectorAll('.btn-score-select').forEach((sibling) => {
-          sibling.className = 'btn-score-select w-11 h-9 rounded-full text-xs font-extrabold border transition bg-white text-slate-700 hover:bg-slate-100 border-slate-200';
-        });
-        btn.className = `btn-score-select w-11 h-9 rounded-full text-xs font-extrabold border transition ${getRateClass(selectedRate)}`;
+        row.querySelectorAll('.rating-btn').forEach((s) => s.classList.remove('is-selected'));
+        btn.classList.add('is-selected');
         updateLiveComputedScore();
       });
     });
+
     criteriaContainer.appendChild(row);
   });
 
@@ -1854,27 +1880,39 @@ const renderLiveInterviewSheet = () => {
   likertContainer.innerHTML = '';
   MANDATORY_LIKERT_QUESTIONS.forEach((q, idx) => {
     const block = document.createElement('div');
-    block.className = 'p-4 bg-slate-50 rounded-3xl border border-slate-200 space-y-3';
+    block.className = 'likert-card';
     block.innerHTML = `
-      <p class="text-xs font-bold text-slate-800">${idx + 1}. ${q.text}</p>
-      <div class="flex flex-wrap gap-2 pt-1">
-        ${['Strongly Agree', 'Agree', 'Disagree', 'Could not determine'].map((choice) => `
-          <button type="button" data-choice="${choice}" class="btn-likert-choice px-4 py-2 text-xs rounded-full border font-medium transition ${likertResponses[q.id] === choice ? getLikertClass(choice) : 'bg-white border-slate-200 hover:bg-slate-100 text-slate-600'}">${choice}</button>
+      <div class="likert-card__question">
+        <span class="likert-card__num">${idx + 1}</span>
+        <p class="likert-card__text">${q.text}</p>
+      </div>
+      <div class="likert-choice-group">
+        ${[
+          { choice: 'Strongly Agree',       icon: '✓✓', mod: 'sa' },
+          { choice: 'Agree',                icon: '✓',  mod: 'a'  },
+          { choice: 'Disagree',             icon: '✕',  mod: 'd'  },
+          { choice: 'Could not determine',  icon: '?',  mod: 'nd' }
+        ].map(({ choice, icon, mod }) => `
+          <button type="button" data-choice="${choice}"
+            class="likert-btn likert-btn--${mod} ${likertResponses[q.id] === choice ? 'is-selected' : ''}"
+            aria-label="${choice}">
+            <span class="likert-btn__icon" aria-hidden="true">${icon}</span>
+            <span class="likert-btn__label">${choice}</span>
+          </button>
         `).join('')}
       </div>
     `;
 
-    block.querySelectorAll('.btn-likert-choice').forEach((btn) => {
+    block.querySelectorAll('.likert-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const selectedChoice = btn.getAttribute('data-choice');
         likertResponses[q.id] = selectedChoice;
-        block.querySelectorAll('.btn-likert-choice').forEach((sibling) => {
-          sibling.className = 'btn-likert-choice px-4 py-2 text-xs rounded-full border font-medium transition bg-white border-slate-200 hover:bg-slate-100 text-slate-600';
-        });
-        btn.className = `btn-likert-choice px-4 py-2 text-xs rounded-full border font-medium transition ${getLikertClass(selectedChoice)}`;
+        block.querySelectorAll('.likert-btn').forEach((s) => s.classList.remove('is-selected'));
+        btn.classList.add('is-selected');
         updateLiveComputedScore();
       });
     });
+
     likertContainer.appendChild(block);
   });
   updateLiveComputedScore();
@@ -1882,15 +1920,15 @@ const renderLiveInterviewSheet = () => {
 
 const getRateClass = (rate) => {
   if (rate === 'VS') return 'bg-emerald-600 text-white border-emerald-700 shadow-sm';
-  if (rate === 'S') return 'bg-indigo-600 text-white border-indigo-700 shadow-sm';
+  if (rate === 'S')  return 'bg-indigo-600 text-white border-indigo-700 shadow-sm';
   if (rate === 'NS') return 'bg-rose-600 text-white border-rose-700 shadow-sm';
   return 'bg-slate-700 text-white border-slate-800 shadow-sm';
 };
 
 const getLikertClass = (choice) => {
-  if (choice === 'Strongly Agree') return 'bg-emerald-100 border-emerald-500 text-emerald-800 font-bold';
-  if (choice === 'Agree') return 'bg-indigo-100 border-indigo-500 text-indigo-800 font-bold';
-  if (choice === 'Disagree') return 'bg-rose-100 border-rose-500 text-rose-800 font-bold';
+  if (choice === 'Strongly Agree')      return 'bg-emerald-100 border-emerald-500 text-emerald-800 font-bold';
+  if (choice === 'Agree')               return 'bg-indigo-100 border-indigo-500 text-indigo-800 font-bold';
+  if (choice === 'Disagree')            return 'bg-rose-100 border-rose-500 text-rose-800 font-bold';
   return 'bg-slate-200 border-slate-500 text-slate-800 font-bold';
 };
 
