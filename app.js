@@ -494,6 +494,10 @@ const enterWorkspace = (wsName) => {
   workspacePanelEntry.classList.add('hidden');
   mainAppContainer.classList.remove('hidden');
   mainAppContainer.classList.add('visible');
+  
+  // Force reflow to ensure visibility
+  void mainAppContainer.offsetHeight;
+  
   loginShell?.classList.add('is-authenticated');
   headerWsBadge.textContent = wsName;
   headerWsBadge.classList.remove('hidden');
@@ -512,12 +516,23 @@ const enterWorkspace = (wsName) => {
   if (analyticsSearch) analyticsSearch.value = '';
   dashboardVisible = false;
   analyticsDashboardPanel?.classList.add('hidden');
-  Object.keys(chartInstances).forEach(destroyChart);
+  
+  try {
+    Object.keys(chartInstances).forEach(destroyChart);
+  } catch (e) {
+    console.error('Error destroying charts:', e);
+  }
+  
   legacyCleanupDone = false;
-  loadWorkspaceSettings();
-  loadInterviewDraft().then(() => renderDraftBanner());
-  setupFirestoreSync();
-  switchTab('dashboard');
+  
+  try {
+    loadWorkspaceSettings();
+    loadInterviewDraft().then(() => renderDraftBanner());
+    setupFirestoreSync();
+    switchTab('dashboard');
+  } catch (e) {
+    console.error('Error loading workspace:', e);
+  }
 };
 
 btnSwitchWs.addEventListener('click', () => {
