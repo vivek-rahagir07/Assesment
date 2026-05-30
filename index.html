@@ -8,10 +8,8 @@
   <link rel="icon" href="photoes/logo.png" type="image/png" />
   <link rel="apple-touch-icon" href="photoes/logo.png" />
   <meta name="theme-color" content="#4f46e5" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="relative min-h-screen text-slate-900">
@@ -520,8 +518,9 @@
   </div>
 
   <!-- Hidden print root for scorecards -->
-  <div id="scorecard-print-root" class="scorecard-print-root" aria-hidden="true"></div>
+  <div id="scorecard-print-root" class="scorecard-print-root hidden" aria-hidden="true"></div>
 
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="app.js" type="module" defer></script>
 </body>
 </html>

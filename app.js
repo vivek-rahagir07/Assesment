@@ -133,6 +133,49 @@ let draftSaveTimer = null;
 let settingsSaveTimer = null;
 let liveInterviewAutosaveBound = false;
 
+const SCRIPT_URLS = {
+  chart: 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+  xlsx: 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js',
+  html2pdf: 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+};
+
+const scriptPromises = {};
+
+const loadScript = (src) => {
+  if (scriptPromises[src]) return scriptPromises[src];
+  scriptPromises[src] = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing?.dataset.loaded === 'true') {
+      resolve();
+      return;
+    }
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', reject, { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return scriptPromises[src];
+};
+
+const isMobileDevice = () => window.matchMedia('(max-width: 768px)').matches
+  || window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+let analyticsRenderTimer = null;
+const scheduleRenderAnalytics = () => {
+  clearTimeout(analyticsRenderTimer);
+  analyticsRenderTimer = setTimeout(renderAnalytics, isMobileDevice() ? 280 : 120);
+};
+
 const showToast = (message, type = 'success') => {
   toastMsg.textContent = message;
   const styles = {
@@ -216,31 +259,35 @@ const typeWriterEffect = async (element, text, speed = 40) => {
 
 const initLoginUX = () => {
   if (loginTagline) {
-    loginTagline.style.borderRight = '2px solid rgba(199, 210, 254, 0.8)';
-    loginTagline.style.paddingRight = '4px';
-    
-    setInterval(() => {
-      loginTagline.style.borderColor = loginTagline.style.borderColor === 'transparent' ? 'rgba(199, 210, 254, 0.8)' : 'transparent';
-    }, 500);
+    if (isMobileDevice()) {
+      loginTagline.textContent = LOGIN_TAGLINES[0];
+    } else {
+      loginTagline.style.borderRight = '2px solid rgba(199, 210, 254, 0.8)';
+      loginTagline.style.paddingRight = '4px';
 
-    const playTaglineSequence = async () => {
-      while (true) {
-        await typeWriterEffect(loginTagline, LOGIN_TAGLINES[taglineIndex]);
-        await new Promise(r => setTimeout(r, 4000));
-        
-        let currentText = loginTagline.textContent;
-        while (currentText.length > 0) {
-          currentText = currentText.slice(0, -1);
-          loginTagline.textContent = currentText;
-          await new Promise(r => setTimeout(r, 20));
+      setInterval(() => {
+        loginTagline.style.borderColor = loginTagline.style.borderColor === 'transparent' ? 'rgba(199, 210, 254, 0.8)' : 'transparent';
+      }, 500);
+
+      const playTaglineSequence = async () => {
+        while (true) {
+          await typeWriterEffect(loginTagline, LOGIN_TAGLINES[taglineIndex]);
+          await new Promise(r => setTimeout(r, 4000));
+
+          let currentText = loginTagline.textContent;
+          while (currentText.length > 0) {
+            currentText = currentText.slice(0, -1);
+            loginTagline.textContent = currentText;
+            await new Promise(r => setTimeout(r, 20));
+          }
+
+          taglineIndex = (taglineIndex + 1) % LOGIN_TAGLINES.length;
+          await new Promise(r => setTimeout(r, 500));
         }
-        
-        taglineIndex = (taglineIndex + 1) % LOGIN_TAGLINES.length;
-        await new Promise(r => setTimeout(r, 500));
-      }
-    };
-    
-    setTimeout(playTaglineSequence, 800);
+      };
+
+      setTimeout(playTaglineSequence, 800);
+    }
   }
 
   wsNameInput?.addEventListener('input', () => {
@@ -607,10 +654,17 @@ const exportCandidatesCSV = () => {
   showToast(`Exported ${list.length} record${list.length > 1 ? 's' : ''} to CSV.`);
 };
 
-const exportCandidatesExcel = () => {
+const exportCandidatesExcel = async () => {
   const list = getFilteredCandidates();
   if (list.length === 0) {
     showToast('No candidate records to export.', 'error');
+    return;
+  }
+
+  try {
+    await loadScript(SCRIPT_URLS.xlsx);
+  } catch (_) {
+    showToast('Could not load Excel library. Try CSV export.', 'error');
     return;
   }
 
@@ -668,8 +722,17 @@ const renderDashboardStats = (list) => {
   `).join('');
 };
 
-const renderAnalyticsDashboard = () => {
-  if (!analyticsDashboardPanel || typeof Chart === 'undefined') return;
+const renderAnalyticsDashboard = async () => {
+  if (!analyticsDashboardPanel) return;
+
+  try {
+    await loadScript(SCRIPT_URLS.chart);
+  } catch (_) {
+    showToast('Could not load chart library.', 'error');
+    return;
+  }
+
+  if (typeof Chart === 'undefined') return;
 
   const list = getFilteredCandidates().slice().sort((a, b) => (b.calculatedScore || 0) - (a.calculatedScore || 0));
   renderDashboardStats(list);
@@ -678,6 +741,8 @@ const renderAnalyticsDashboard = () => {
 
   if (list.length === 0) return;
 
+  const chartAnim = !isMobileDevice();
+  const chartPerf = { animation: chartAnim, responsiveAnimationDuration: chartAnim ? 400 : 0 };
   const topT = list.filter((c) => c.calculatedScore >= scoreThresholds.high);
   const midT = list.filter((c) => c.calculatedScore >= scoreThresholds.low && c.calculatedScore < scoreThresholds.high);
   const lowT = list.filter((c) => c.calculatedScore < scoreThresholds.low);
@@ -697,6 +762,7 @@ const renderAnalyticsDashboard = () => {
         }]
       },
       options: {
+        ...chartPerf,
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
@@ -722,6 +788,7 @@ const renderAnalyticsDashboard = () => {
         }]
       },
       options: {
+        ...chartPerf,
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
@@ -754,6 +821,7 @@ const renderAnalyticsDashboard = () => {
         }]
       },
       options: {
+        ...chartPerf,
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
@@ -779,6 +847,7 @@ const renderAnalyticsDashboard = () => {
         }]
       },
       options: {
+        ...chartPerf,
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
@@ -934,7 +1003,7 @@ const saveInterviewDraft = async () => {
 const scheduleDraftSave = () => {
   if (!activeInterviewTemplate) return;
   clearTimeout(draftSaveTimer);
-  draftSaveTimer = setTimeout(saveInterviewDraft, 1500);
+  draftSaveTimer = setTimeout(saveInterviewDraft, isMobileDevice() ? 3000 : 1500);
 };
 
 const loadInterviewDraft = async () => {
@@ -1068,6 +1137,8 @@ const discardInterviewDraft = async () => {
 const buildScorecardHtml = (cand, criteria) => {
   const category = getPerformerCategory(cand.calculatedScore);
   const breakdown = computeScoreBreakdown(cand.scores || {}, criteria, cand.likertAnswers || {});
+  const logoUrl = new URL('photoes/logo.png', window.location.href).href;
+  const evalDate = cand.date || (cand.evaluatedAt ? new Date(cand.evaluatedAt).toLocaleDateString() : '—');
 
   let criteriaHtml = criteria.map((crit) => {
     const rate = (cand.scores || {})[crit.id] || '—';
@@ -1096,7 +1167,7 @@ const buildScorecardHtml = (cand, criteria) => {
   return `
     <div style="font-family:system-ui,sans-serif;color:#0f172a;padding:32px;max-width:800px;">
       <div style="display:flex;align-items:center;gap:16px;border-bottom:2px solid #4f46e5;padding-bottom:16px;margin-bottom:24px;">
-        <img src="photoes/logo.png" alt="Logo" style="height:48px;width:auto;" onerror="this.style.display='none'" />
+        <img src="${logoUrl}" alt="Logo" style="height:48px;width:auto;" />
         <div>
           <h1 style="margin:0;font-size:22px;font-weight:800;">TalentCalibrate</h1>
           <p style="margin:4px 0 0;font-size:12px;color:#64748b;">Interview Evaluation Scorecard</p>
@@ -1154,45 +1225,127 @@ const buildScorecardHtml = (cand, criteria) => {
         <div>
           <p style="margin:0 0 32px;font-size:11px;color:#64748b;">Date</p>
           <div style="border-bottom:1px solid #94a3b8;"></div>
-          <p style="margin:8px 0 0;font-size:11px;">${escapeHtml(cand.date || new Date(cand.evaluatedAt).toLocaleDateString())}</p>
+          <p style="margin:8px 0 0;font-size:11px;">${escapeHtml(evalDate)}</p>
         </div>
       </div>
     </div>`;
 };
 
+const buildScorecardDocumentHtml = (cand, criteria) => {
+  const body = buildScorecardHtml(cand, criteria);
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scorecard - ${escapeHtml(cand.name)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: #fff; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  @media print { body { padding: 8px; } }
+</style>
+</head><body>${body}</body></html>`;
+};
+
+const printScorecardViaIframe = (cand, criteria) => {
+  const docHtml = buildScorecardDocumentHtml(cand, criteria);
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;z-index:9999;background:#fff;';
+  document.body.appendChild(iframe);
+
+  const cleanup = () => {
+    setTimeout(() => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 1500);
+  };
+
+  const doc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!doc) {
+    cleanup();
+    showToast('Could not open print preview.', 'error');
+    return;
+  }
+
+  doc.open();
+  doc.write(docHtml);
+  doc.close();
+
+  const runPrint = () => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (err) {
+      console.error(err);
+      const popup = window.open('', '_blank');
+      if (popup) {
+        popup.document.write(docHtml);
+        popup.document.close();
+        popup.onload = () => popup.print();
+      } else {
+        showToast('Allow pop-ups to print the scorecard.', 'error');
+      }
+    }
+    cleanup();
+  };
+
+  if (iframe.contentWindow?.document?.readyState === 'complete') {
+    setTimeout(runPrint, 250);
+  } else {
+    iframe.onload = () => setTimeout(runPrint, 250);
+    setTimeout(runPrint, 600);
+  }
+};
+
 const printCandidateScorecard = (cand) => {
   const criteria = getCandidateCriteria(cand);
-  if (!scorecardPrintRoot) return;
-  scorecardPrintRoot.innerHTML = buildScorecardHtml(cand, criteria);
-  window.print();
+  printScorecardViaIframe(cand, criteria);
 };
 
 const downloadCandidatePdf = async (cand) => {
   const criteria = getCandidateCriteria(cand);
-  if (!scorecardPrintRoot) return;
 
-  if (typeof html2pdf === 'undefined') {
+  if (isMobileDevice()) {
     printCandidateScorecard(cand);
-    showToast('PDF library unavailable — opened print dialog instead.', 'info');
+    showToast('Choose "Save as PDF" in the print dialog.', 'info');
     return;
   }
 
-  scorecardPrintRoot.innerHTML = buildScorecardHtml(cand, criteria);
+  try {
+    await loadScript(SCRIPT_URLS.html2pdf);
+  } catch (_) {
+    printCandidateScorecard(cand);
+    showToast('PDF library unavailable — use Print instead.', 'info');
+    return;
+  }
+
+  if (typeof html2pdf === 'undefined') {
+    printCandidateScorecard(cand);
+    return;
+  }
+
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;left:0;top:0;width:800px;background:#fff;z-index:-1;opacity:0;pointer-events:none;';
+  container.innerHTML = buildScorecardHtml(cand, criteria);
+  document.body.appendChild(container);
   const slug = (cand.name || 'candidate').replace(/[^a-zA-Z0-9_-]/g, '_');
 
   try {
     await html2pdf().set({
       margin: 10,
       filename: `Scorecard_${slug}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      image: { type: 'jpeg', quality: 0.92 },
+      html2canvas: { scale: 1.5, useCORS: true, logging: false },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(scorecardPrintRoot).save();
+    }).from(container).save();
     showToast('PDF downloaded successfully.');
   } catch (err) {
     console.error(err);
     printCandidateScorecard(cand);
     showToast('PDF export failed — opened print dialog instead.', 'error');
+  } finally {
+    container.remove();
   }
 };
 
@@ -1943,7 +2096,7 @@ cutoffLowSlider.addEventListener('input', (event) => {
 
 analyticsSearch.addEventListener('input', (event) => {
   filterQuery = event.target.value;
-  renderAnalytics();
+  scheduleRenderAnalytics();
 });
 
 analyticsRoleFilter.addEventListener('change', (event) => {
