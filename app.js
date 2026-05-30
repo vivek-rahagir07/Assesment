@@ -55,33 +55,19 @@ const MANDATORY_LIKERT_QUESTIONS = [
   { id: 'likert-6', text: 'The applicant should be included in the final list of recommended applicants.' }
 ];
 
+const workspaceEntryCard = document.getElementById('workspace-entry');
 const mainAppContainer = document.getElementById('main-app-container');
 const loginShell = document.getElementById('login-shell');
-const workspacePanelEntry = document.getElementById('workspace-panel');
-
-// Workspace options
-const workspaceOptions = document.getElementById('workspace-options');
-
-// Existing workspace form
-const workspaceEntryExisting = document.getElementById('workspace-entry-existing');
-const workspaceFormExisting = document.getElementById('workspace-form-existing');
-const wsNameExistingInput = document.getElementById('ws-name-existing');
-const wsPassExistingInput = document.getElementById('ws-pass-existing');
-const wsErrorMsgExisting = document.getElementById('ws-error-msg-existing');
-const btnTogglePassExisting = document.getElementById('btn-toggle-pass-existing');
-const btnWsSubmitExisting = document.getElementById('btn-ws-submit-existing');
+const workspaceForm = document.getElementById('workspace-form');
+const wsNameInput = document.getElementById('ws-name');
+const wsPassInput = document.getElementById('ws-pass');
+const wsErrorMsg = document.getElementById('ws-error-msg');
+const btnTogglePass = document.getElementById('btn-toggle-pass');
+const btnWsSubmit = document.getElementById('btn-ws-submit');
 const loginAuthPill = document.getElementById('login-auth-pill');
 const loginAuthLabel = document.getElementById('login-auth-label');
-
-// Create new workspace form
-const workspaceEntryNew = document.getElementById('workspace-entry-new');
-const workspaceFormNew = document.getElementById('workspace-form-new');
-const wsNameNewInput = document.getElementById('ws-name-new');
-const wsPassNewInput = document.getElementById('ws-pass-new');
-const wsErrorMsgNew = document.getElementById('ws-error-msg-new');
-const btnTogglePassNew = document.getElementById('btn-toggle-pass-new');
-const btnWsSubmitNew = document.getElementById('btn-ws-submit-new');
-
+const loginGreeting = document.getElementById('login-greeting');
+const loginTagline = document.getElementById('login-tagline');
 const loginSuccessOverlay = document.getElementById('login-success-overlay');
 const loginSuccessMsg = document.getElementById('login-success-msg');
 const headerWsBadge = document.getElementById('header-ws-badge');
@@ -271,62 +257,54 @@ const typeWriterEffect = async (element, text, speed = 40) => {
   }
 };
 
-const showWorkspaceOptions = () => {
-  workspaceOptions.classList.remove('hidden');
-  workspaceEntryExisting.classList.add('hidden');
-  workspaceEntryNew.classList.add('hidden');
-};
-
-const showExistingWorkspaceForm = () => {
-  workspaceOptions.classList.add('hidden');
-  workspaceEntryExisting.classList.remove('hidden');
-  workspaceEntryNew.classList.add('hidden');
-  wsNameExistingInput?.focus();
-};
-
-const showCreateWorkspaceForm = () => {
-  workspaceOptions.classList.add('hidden');
-  workspaceEntryExisting.classList.add('hidden');
-  workspaceEntryNew.classList.remove('hidden');
-  wsNameNewInput?.focus();
-};
-
 const initLoginUX = () => {
-  // Re-query buttons to ensure DOM is ready
-  const btnExistingWorkspace = document.getElementById('btn-existing-workspace');
-  const btnCreateWorkspace = document.getElementById('btn-create-workspace');
-  const btnBackToOptionsExisting = document.getElementById('btn-back-to-options');
-  const btnBackToOptionsNew = document.getElementById('btn-back-to-options-new');
-  
-  // Option buttons
-  if (btnExistingWorkspace) btnExistingWorkspace.addEventListener('click', showExistingWorkspaceForm);
-  if (btnCreateWorkspace) btnCreateWorkspace.addEventListener('click', showCreateWorkspaceForm);
-  if (btnBackToOptionsExisting) btnBackToOptionsExisting.addEventListener('click', showWorkspaceOptions);
-  if (btnBackToOptionsNew) btnBackToOptionsNew.addEventListener('click', showWorkspaceOptions);
+  if (loginTagline) {
+    if (isMobileDevice()) {
+      loginTagline.textContent = LOGIN_TAGLINES[0];
+    } else {
+      loginTagline.style.borderRight = '2px solid rgba(199, 210, 254, 0.8)';
+      loginTagline.style.paddingRight = '4px';
 
-  // Initialize input validation for existing form
-  wsNameExistingInput?.addEventListener('input', () => {
-    const wrap = wsNameExistingInput.closest('.field-input-wrap');
-    wrap?.classList.toggle('is-valid', wsNameExistingInput.value.trim().length >= 2);
-    wsErrorMsgExisting.classList.add('hidden');
-  });
-  wsPassExistingInput?.addEventListener('input', () => wsErrorMsgExisting.classList.add('hidden'));
+      setInterval(() => {
+        loginTagline.style.borderColor = loginTagline.style.borderColor === 'transparent' ? 'rgba(199, 210, 254, 0.8)' : 'transparent';
+      }, 500);
 
-  // Initialize input validation for new form
-  wsNameNewInput?.addEventListener('input', () => {
-    const wrap = wsNameNewInput.closest('.field-input-wrap');
-    wrap?.classList.toggle('is-valid', wsNameNewInput.value.trim().length >= 2);
-    wsErrorMsgNew.classList.add('hidden');
+      const playTaglineSequence = async () => {
+        while (true) {
+          await typeWriterEffect(loginTagline, LOGIN_TAGLINES[taglineIndex]);
+          await new Promise(r => setTimeout(r, 4000));
+
+          let currentText = loginTagline.textContent;
+          while (currentText.length > 0) {
+            currentText = currentText.slice(0, -1);
+            loginTagline.textContent = currentText;
+            await new Promise(r => setTimeout(r, 20));
+          }
+
+          taglineIndex = (taglineIndex + 1) % LOGIN_TAGLINES.length;
+          await new Promise(r => setTimeout(r, 500));
+        }
+      };
+
+      setTimeout(playTaglineSequence, 800);
+    }
+  }
+
+  wsNameInput?.addEventListener('input', () => {
+    const wrap = wsNameInput.closest('.field-input-wrap');
+    wrap?.classList.toggle('is-valid', wsNameInput.value.trim().length >= 2);
+    wsErrorMsg.classList.add('hidden');
   });
-  wsPassNewInput?.addEventListener('input', () => wsErrorMsgNew.classList.add('hidden'));
+
+  wsPassInput?.addEventListener('input', () => wsErrorMsg.classList.add('hidden'));
 
   const urlParams = new URLSearchParams(window.location.search);
   const wsParam = urlParams.get('workspace');
-  if (wsParam && wsNameExistingInput) {
-    wsNameExistingInput.value = wsParam;
-    const wrap = wsNameExistingInput.closest('.field-input-wrap');
+  if (wsParam && wsNameInput) {
+    wsNameInput.value = wsParam;
+    const wrap = wsNameInput.closest('.field-input-wrap');
     wrap?.classList.add('is-valid');
-    setTimeout(() => wsPassExistingInput?.focus(), 600);
+    setTimeout(() => wsPassInput?.focus(), 600);
   }
 };
 
@@ -337,38 +315,21 @@ const setLoginAuthReady = (ready = true) => {
   loginAuthLabel.textContent = ready ? 'All set — you can sign in now' : 'Connecting you securely…';
 };
 
-const showLoginErrorExisting = (message) => {
-  wsErrorMsgExisting.textContent = message;
-  wsErrorMsgExisting.classList.remove('hidden');
-  wsErrorMsgExisting.style.animation = 'none';
-  void wsErrorMsgExisting.offsetWidth;
-  wsErrorMsgExisting.style.animation = '';
-  workspaceFormExisting?.classList.add('shake-form');
-  setTimeout(() => workspaceFormExisting?.classList.remove('shake-form'), 500);
+const showLoginError = (message) => {
+  wsErrorMsg.textContent = message;
+  wsErrorMsg.classList.remove('hidden');
+  wsErrorMsg.style.animation = 'none';
+  void wsErrorMsg.offsetWidth;
+  wsErrorMsg.style.animation = '';
+  workspaceForm?.classList.add('shake-form');
+  setTimeout(() => workspaceForm?.classList.remove('shake-form'), 500);
 };
 
-const showLoginErrorNew = (message) => {
-  wsErrorMsgNew.textContent = message;
-  wsErrorMsgNew.classList.remove('hidden');
-  wsErrorMsgNew.style.animation = 'none';
-  void wsErrorMsgNew.offsetWidth;
-  wsErrorMsgNew.style.animation = '';
-  workspaceFormNew?.classList.add('shake-form');
-  setTimeout(() => workspaceFormNew?.classList.remove('shake-form'), 500);
-};
-
-const setSubmitLoadingExisting = (loading) => {
-  if (!btnWsSubmitExisting) return;
-  btnWsSubmitExisting.disabled = loading;
-  btnWsSubmitExisting.classList.toggle('is-loading', loading);
-  btnWsSubmitExisting.querySelector('.login-submit-loader')?.classList.toggle('hidden', !loading);
-};
-
-const setSubmitLoadingNew = (loading) => {
-  if (!btnWsSubmitNew) return;
-  btnWsSubmitNew.disabled = loading;
-  btnWsSubmitNew.classList.toggle('is-loading', loading);
-  btnWsSubmitNew.querySelector('.login-submit-loader')?.classList.toggle('hidden', !loading);
+const setSubmitLoading = (loading) => {
+  if (!btnWsSubmit) return;
+  btnWsSubmit.disabled = loading;
+  btnWsSubmit.classList.toggle('is-loading', loading);
+  btnWsSubmit.querySelector('.login-submit-loader')?.classList.toggle('hidden', !loading);
 };
 
 const playSuccessAndEnter = (wsName, isNew) => {
@@ -384,7 +345,7 @@ const playSuccessAndEnter = (wsName, isNew) => {
     enterWorkspace(wsName);
     loginSuccessOverlay?.classList.add('hidden');
     loginShell?.classList.remove('is-authenticating');
-    setSubmitLoadingExisting(false);
+    setSubmitLoading(false);
     mainAppContainer?.classList.add('app-reveal');
     setTimeout(() => mainAppContainer?.classList.remove('app-reveal'), 700);
   }, 1200);
@@ -392,30 +353,29 @@ const playSuccessAndEnter = (wsName, isNew) => {
 
 initLoginUX();
 
-// Existing Workspace Form Handler
-workspaceFormExisting.addEventListener('submit', async (event) => {
+workspaceForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  wsErrorMsgExisting.classList.add('hidden');
+  wsErrorMsg.classList.add('hidden');
 
   if (!user) {
-    showLoginErrorExisting('Hang tight — we\'re still connecting. Try again in a second.');
+    showLoginError('Hang tight — we\'re still connecting. Try again in a second.');
     return;
   }
 
-  const wsName = wsNameExistingInput.value.trim();
-  const wsPass = wsPassExistingInput.value;
+  const wsName = wsNameInput.value.trim();
+  const wsPass = wsPassInput.value;
 
   if (!wsName || !wsPass) {
-    showLoginErrorExisting('We need both a workspace name and password to sign in.');
+    showLoginError('We need both a workspace name and password to get you in.');
     return;
   }
 
   if (!/^[a-zA-Z0-9_-]{2,64}$/.test(wsName)) {
-    showLoginErrorExisting('Workspace name: 2–64 characters, letters, numbers, _ and - only.');
+    showLoginError('Workspace name: 2–64 characters, letters, numbers, _ and - only.');
     return;
   }
 
-  setSubmitLoadingExisting(true);
+  setSubmitLoading(true);
 
   try {
     const wsRef = doc(db, 'artifacts', app_id, 'workspaces', wsName);
@@ -425,47 +385,7 @@ workspaceFormExisting.addEventListener('submit', async (event) => {
         playSuccessAndEnter(wsName, false);
         return;
       }
-      showLoginErrorExisting('That password doesn\'t match this workspace. Double-check and try again.');
-    } else {
-      showLoginErrorExisting('This workspace does not exist. Please create a new one instead.');
-    }
-  } catch (err) {
-    console.error(err);
-    showLoginErrorExisting(`Error: ${err.message}`);
-  }
-  setSubmitLoadingExisting(false);
-});
-
-// Create New Workspace Form Handler
-workspaceFormNew.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  wsErrorMsgNew.classList.add('hidden');
-
-  if (!user) {
-    showLoginErrorNew('Hang tight — we\'re still connecting. Try again in a second.');
-    return;
-  }
-
-  const wsName = wsNameNewInput.value.trim();
-  const wsPass = wsPassNewInput.value;
-
-  if (!wsName || !wsPass) {
-    showLoginErrorNew('We need both a workspace name and password to create a new workspace.');
-    return;
-  }
-
-  if (!/^[a-zA-Z0-9_-]{2,64}$/.test(wsName)) {
-    showLoginErrorNew('Workspace name: 2–64 characters, letters, numbers, _ and - only.');
-    return;
-  }
-
-  setSubmitLoadingNew(true);
-
-  try {
-    const wsRef = doc(db, 'artifacts', app_id, 'workspaces', wsName);
-    const wsSnap = await getDoc(wsRef);
-    if (wsSnap.exists()) {
-      showLoginErrorNew('This workspace name is already taken. Please choose a different one.');
+      showLoginError('That password doesn\'t match this workspace. Double-check and try again.');
     } else {
       await setDoc(wsRef, {
         password: wsPass,
@@ -477,14 +397,14 @@ workspaceFormNew.addEventListener('submit', async (event) => {
     }
   } catch (err) {
     console.error(err);
-    showLoginErrorNew(`Error: ${err.message}`);
+    showLoginError(`Error: ${err.message}`);
   }
-  setSubmitLoadingNew(false);
+  setSubmitLoading(false);
 });
 
 const enterWorkspace = (wsName) => {
   currentWorkspace = wsName;
-  workspacePanelEntry.classList.add('hidden');
+  workspaceEntryCard.classList.add('hidden');
   mainAppContainer.classList.remove('hidden');
   mainAppContainer.classList.add('visible');
   
@@ -498,12 +418,9 @@ const enterWorkspace = (wsName) => {
     btnShareWs.classList.remove('hidden');
     btnShareWs.classList.add('flex');
   }
-  wsNameExistingInput.value = '';
-  wsPassExistingInput.value = '';
-  wsNameNewInput.value = '';
-  wsPassNewInput.value = '';
-  wsErrorMsgExisting.classList.add('hidden');
-  wsErrorMsgNew.classList.add('hidden');
+  wsNameInput.value = '';
+  wsPassInput.value = '';
+  wsErrorMsg.classList.add('hidden');
   filterRole = 'All';
   filterQuery = '';
   if (analyticsSearch) analyticsSearch.value = '';
@@ -533,7 +450,7 @@ btnSwitchWs.addEventListener('click', () => {
 
   cleanupActiveInterview(true);
   currentWorkspace = null;
-  workspacePanelEntry.classList.remove('hidden');
+  workspaceEntryCard.classList.remove('hidden');
   mainAppContainer.classList.add('hidden');
   loginShell?.classList.remove('is-authenticated');
   if (btnShareWs) {
@@ -542,11 +459,8 @@ btnSwitchWs.addEventListener('click', () => {
   }
   loginSuccessOverlay?.classList.add('hidden');
   setLoginAuthReady(!!user);
-  setSubmitLoadingExisting(false);
-  setSubmitLoadingNew(false);
-  
-  // Show workspace options instead of form
-  showWorkspaceOptions();
+  setSubmitLoading(false);
+  wsNameInput?.focus();
 
   if (unsubscribeTemplates) unsubscribeTemplates();
   if (unsubscribeCandidates) unsubscribeCandidates();
@@ -564,28 +478,27 @@ btnSwitchWs.addEventListener('click', () => {
   renderAnalytics();
 });
 
-if (btnTogglePassExisting && wsPassExistingInput) {
-  btnTogglePassExisting.addEventListener('click', () => {
-    const isPassword = wsPassExistingInput.type === 'password';
-    wsPassExistingInput.type = isPassword ? 'text' : 'password';
-    btnTogglePassExisting.querySelector('.icon-show')?.classList.toggle('hidden', isPassword);
-    btnTogglePassExisting.querySelector('.icon-hide')?.classList.toggle('hidden', !isPassword);
-    btnTogglePassExisting.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
-  });
-}
+const showWorkspacePanel = () => {
+  if (workspaceEntryCard.classList.contains('hidden')) {
+    workspaceEntryCard.classList.remove('hidden');
+    workspaceEntryCard.classList.add('visible');
+  }
+  workspaceEntryCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  workspaceEntryCard.classList.add('pulse-panel');
+  setTimeout(() => workspaceEntryCard.classList.remove('pulse-panel'), 1200);
+  setTimeout(() => wsNameInput?.focus(), 400);
+};
 
-if (btnTogglePassNew && wsPassNewInput) {
-  btnTogglePassNew.addEventListener('click', () => {
-    const isPassword = wsPassNewInput.type === 'password';
-    wsPassNewInput.type = isPassword ? 'text' : 'password';
-    btnTogglePassNew.querySelector('.icon-show')?.classList.toggle('hidden', isPassword);
-    btnTogglePassNew.querySelector('.icon-hide')?.classList.toggle('hidden', !isPassword);
-    btnTogglePassNew.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
-  });
-}
+btnShowWorkspace.addEventListener('click', showWorkspacePanel);
 
-if (btnShowWorkspace) {
-  btnShowWorkspace.addEventListener('click', showExistingWorkspaceForm);
+if (btnTogglePass && wsPassInput) {
+  btnTogglePass.addEventListener('click', () => {
+    const isPassword = wsPassInput.type === 'password';
+    wsPassInput.type = isPassword ? 'text' : 'password';
+    btnTogglePass.querySelector('.icon-show')?.classList.toggle('hidden', isPassword);
+    btnTogglePass.querySelector('.icon-hide')?.classList.toggle('hidden', !isPassword);
+    btnTogglePass.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+  });
 }
 
 const padTime = (value) => value.toString().padStart(2, '0');
