@@ -23,6 +23,7 @@ const db = getFirestore(app);
 
 let user = null;
 let currentWorkspace = null;
+let wsMode = null; // 'enter' | 'create'
 let templates = [];
 let candidates = [];
 let activeInterviewTemplate = null;
@@ -64,6 +65,7 @@ const wsPassInput = document.getElementById('ws-pass');
 const wsErrorMsg = document.getElementById('ws-error-msg');
 const btnTogglePass = document.getElementById('btn-toggle-pass');
 const btnWsSubmit = document.getElementById('btn-ws-submit');
+const btnWsSubmitText = document.getElementById('btn-ws-submit-text');
 const loginAuthPill = document.getElementById('login-auth-pill');
 const loginAuthLabel = document.getElementById('login-auth-label');
 const loginGreeting = document.getElementById('login-greeting');
@@ -74,6 +76,15 @@ const headerWsBadge = document.getElementById('header-ws-badge');
 const btnSwitchWs = document.getElementById('btn-switch-ws');
 const btnShowWorkspace = document.getElementById('btn-show-workspace');
 const btnShareWs = document.getElementById('btn-share-ws');
+const landingStep = document.getElementById('landing-step');
+const formStep = document.getElementById('form-step');
+const btnModeEnter = document.getElementById('btn-mode-enter');
+const btnModeCreate = document.getElementById('btn-mode-create');
+const btnBackToLanding = document.getElementById('btn-back-to-landing');
+const formStepTitle = document.getElementById('form-step-title');
+const formStepSubtitle = document.getElementById('form-step-subtitle');
+const formStepEyebrow = document.getElementById('form-step-eyebrow');
+const formStepFootnote = document.getElementById('form-step-footnote');
 const navDashboard = document.getElementById('nav-dashboard');
 const navFormBuilder = document.getElementById('nav-form-builder');
 const navClassAnalytics = document.getElementById('nav-class-analytics');
@@ -301,10 +312,16 @@ const initLoginUX = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const wsParam = urlParams.get('workspace');
   if (wsParam && wsNameInput) {
-    wsNameInput.value = wsParam;
-    const wrap = wsNameInput.closest('.field-input-wrap');
-    wrap?.classList.add('is-valid');
-    setTimeout(() => wsPassInput?.focus(), 600);
+    // Shared link — auto-select Enter mode and pre-fill workspace name
+    setTimeout(() => {
+      showFormStep('enter');
+      setTimeout(() => {
+        wsNameInput.value = wsParam;
+        const wrap = wsNameInput.closest('.field-input-wrap');
+        wrap?.classList.add('is-valid');
+        wsPassInput?.focus();
+      }, 250);
+    }, 400);
   }
 };
 
@@ -351,6 +368,64 @@ const playSuccessAndEnter = (wsName, isNew) => {
   }, 1200);
 };
 
+// ── Landing step: mode selection ──
+const wsNameLabel   = document.getElementById('ws-name-label');
+const wsPassLabel   = document.getElementById('ws-pass-label');
+
+const showFormStep = (mode) => {
+  wsMode = mode;
+
+  if (mode === 'create') {
+    formStepEyebrow.textContent  = 'New workspace';
+    formStepTitle.textContent    = 'Create your workspace';
+    formStepSubtitle.textContent = 'Choose a unique name and a strong password. Your workspace will be created instantly.';
+    if (btnWsSubmitText)  btnWsSubmitText.textContent  = 'Create workspace';
+    if (formStepFootnote) formStepFootnote.textContent = 'Only people with your password can join this workspace.';
+    if (wsNameLabel) wsNameLabel.textContent = 'Choose a workspace name';
+    if (wsPassLabel) wsPassLabel.textContent = 'Set a password';
+    wsNameInput.placeholder = 'e.g. Engineering_Q3';
+    wsPassInput.placeholder = 'Choose something memorable';
+    wsPassInput.setAttribute('autocomplete', 'new-password');
+  } else {
+    formStepEyebrow.textContent  = 'Your workspace';
+    formStepTitle.textContent    = 'Sign in to your workspace';
+    formStepSubtitle.textContent = 'Enter your workspace name and password to continue.';
+    if (btnWsSubmitText)  btnWsSubmitText.textContent  = 'Enter workspace';
+    if (formStepFootnote) formStepFootnote.textContent = 'Only people with the workspace password can access it.';
+    if (wsNameLabel) wsNameLabel.textContent = 'Workspace name';
+    if (wsPassLabel) wsPassLabel.textContent = 'Password';
+    wsNameInput.placeholder = 'e.g. Engineering_Q3';
+    wsPassInput.placeholder = 'Your workspace password';
+    wsPassInput.setAttribute('autocomplete', 'current-password');
+  }
+
+  // Animate out landing, animate in form
+  landingStep.classList.add('step-exit');
+  setTimeout(() => {
+    landingStep.classList.add('hidden');
+    landingStep.classList.remove('step-exit');
+    formStep.classList.remove('hidden');
+    formStep.classList.add('step-enter');
+    setTimeout(() => formStep.classList.remove('step-enter'), 350);
+    wsNameInput?.focus();
+  }, 200);
+};
+
+const showLandingStep = () => {
+  wsMode = null;
+  formStep.classList.add('hidden');
+  landingStep.classList.remove('hidden');
+  wsNameInput.value = '';
+  wsPassInput.value = '';
+  wsErrorMsg.classList.add('hidden');
+  const wrap = wsNameInput.closest('.field-input-wrap');
+  wrap?.classList.remove('is-valid');
+};
+
+if (btnModeEnter) btnModeEnter.addEventListener('click', () => showFormStep('enter'));
+if (btnModeCreate) btnModeCreate.addEventListener('click', () => showFormStep('create'));
+if (btnBackToLanding) btnBackToLanding.addEventListener('click', showLandingStep);
+
 initLoginUX();
 
 workspaceForm.addEventListener('submit', async (event) => {
@@ -366,7 +441,7 @@ workspaceForm.addEventListener('submit', async (event) => {
   const wsPass = wsPassInput.value;
 
   if (!wsName || !wsPass) {
-    showLoginError('We need both a workspace name and password to get you in.');
+    showLoginError('We need both a workspace name and password to continue.');
     return;
   }
 
@@ -380,26 +455,46 @@ workspaceForm.addEventListener('submit', async (event) => {
   try {
     const wsRef = doc(db, 'artifacts', app_id, 'workspaces', wsName);
     const wsSnap = await getDoc(wsRef);
-    if (wsSnap.exists()) {
-      if (wsSnap.data().password === wsPass) {
-        playSuccessAndEnter(wsName, false);
+
+    if (wsMode === 'enter') {
+      // ENTER mode: workspace must exist
+      if (!wsSnap.exists()) {
+        showLoginError('No workspace found with that name. Check the name or create a new one.');
+        setSubmitLoading(false);
         return;
       }
-      showLoginError('That password doesn\'t match this workspace. Double-check and try again.');
-    } else {
+      if (wsSnap.data().password !== wsPass) {
+        showLoginError('Incorrect password for this workspace. Please try again.');
+        setSubmitLoading(false);
+        return;
+      }
+      playSuccessAndEnter(wsName, false);
+
+    } else if (wsMode === 'create') {
+      // CREATE mode: workspace must NOT exist
+      if (wsSnap.exists()) {
+        showLoginError('A workspace with this name already exists. Try a different name or enter the existing one.');
+        setSubmitLoading(false);
+        return;
+      }
       await setDoc(wsRef, {
         password: wsPass,
         createdAt: new Date().toISOString(),
         createdBy: user.uid
       });
       playSuccessAndEnter(wsName, true);
-      return;
+
+    } else {
+      // Fallback: shouldn't happen, go back to landing
+      showLandingStep();
+      setSubmitLoading(false);
     }
+
   } catch (err) {
     console.error(err);
     showLoginError(`Error: ${err.message}`);
+    setSubmitLoading(false);
   }
-  setSubmitLoading(false);
 });
 
 const enterWorkspace = (wsName) => {
@@ -450,6 +545,7 @@ btnSwitchWs.addEventListener('click', () => {
 
   cleanupActiveInterview(true);
   currentWorkspace = null;
+  wsMode = null;
   workspaceEntryCard.classList.remove('hidden');
   mainAppContainer.classList.add('hidden');
   loginShell?.classList.remove('is-authenticated');
@@ -460,7 +556,9 @@ btnSwitchWs.addEventListener('click', () => {
   loginSuccessOverlay?.classList.add('hidden');
   setLoginAuthReady(!!user);
   setSubmitLoading(false);
-  wsNameInput?.focus();
+
+  // Return to landing step
+  showLandingStep();
 
   if (unsubscribeTemplates) unsubscribeTemplates();
   if (unsubscribeCandidates) unsubscribeCandidates();
