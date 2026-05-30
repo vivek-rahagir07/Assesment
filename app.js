@@ -79,7 +79,6 @@ const navClassAnalytics = document.getElementById('nav-class-analytics');
 const navLiveInterview = document.getElementById('nav-live-interview');
 const navActiveAssessmentContainer = document.getElementById('nav-active-assessment-container');
 const navActiveCandidateName = document.getElementById('nav-active-candidate-name');
-const liveTimerLabel = document.getElementById('live-timer');
 const tabDashboardContent = document.getElementById('tab-dashboard-content');
 const tabFormBuilderContent = document.getElementById('tab-form-builder-content');
 const tabLiveInterviewContent = document.getElementById('tab-live-interview-content');
@@ -270,6 +269,11 @@ workspaceForm.addEventListener('submit', async (event) => {
     return;
   }
 
+  if (!/^[a-zA-Z0-9_-]{2,64}$/.test(wsName)) {
+    showLoginError('Workspace name: 2–64 characters, letters, numbers, _ and - only.');
+    return;
+  }
+
   setSubmitLoading(true);
 
   try {
@@ -311,6 +315,7 @@ const enterWorkspace = (wsName) => {
   filterRole = 'All';
   filterQuery = '';
   if (analyticsSearch) analyticsSearch.value = '';
+  legacyCleanupDone = false;
   setupFirestoreSync();
   switchTab('dashboard');
 };
@@ -333,6 +338,7 @@ btnSwitchWs.addEventListener('click', () => {
 
   templates = [];
   candidates = [];
+  legacyCleanupDone = false;
   renderTemplates();
   renderAnalytics();
 });
@@ -381,7 +387,7 @@ const evaluateOverallPerformanceScore = (scores, rubrics, likerts) => {
     }
   });
 
-  const criteriaFinalScore = totalWeightUsed > 0 ? (totalWeightedScore / totalWeightUsed) * 100 : 100;
+  const criteriaFinalScore = totalWeightUsed > 0 ? (totalWeightedScore / totalWeightUsed) * 100 : 0;
   let totalLikertScore = 0;
   let likertsAnswered = 0;
   Object.keys(likerts).forEach((key) => {
@@ -394,7 +400,9 @@ const evaluateOverallPerformanceScore = (scores, rubrics, likerts) => {
     }
   });
 
-  const likertFinalScore = likertsAnswered > 0 ? (totalLikertScore / (likertsAnswered * 10)) * 100 : 100;
+  if (likertsAnswered === 0) return Math.round(criteriaFinalScore * 10) / 10;
+
+  const likertFinalScore = (totalLikertScore / (likertsAnswered * 10)) * 100;
   const finalScore = (criteriaFinalScore * 0.6) + (likertFinalScore * 0.4);
   return Math.round(finalScore * 10) / 10;
 };
@@ -406,16 +414,27 @@ const getPerformerCategory = (score) => {
 };
 
 const renderTemplates = () => {
+  if (!templatesGrid) return;
   templatesGrid.innerHTML = '';
+
   if (templates.length === 0) {
     templatesGrid.innerHTML = `
       <div class="bg-white rounded-3xl border border-slate-200 p-12 text-center col-span-full shadow-xl">
-        <h3 class="text-md font-bold text-slate-900 mb-1">No blueprints loaded yet</h3>
-        <p class="text-sm text-slate-500 mb-4">Click below to automatically pre-populate the database with the standardized Image evaluation templates.</p>
-        <button id="btn-load-defaults-empty" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-full transition shadow-lg">Auto-Generate Standard Rubric Forms</button>
+        <div class="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-2xl">📋</div>
+        <h3 class="text-md font-bold text-slate-900 mb-1">No rubrics yet</h3>
+        <p class="text-sm text-slate-500 mb-6 max-w-sm mx-auto">Create your first evaluation template to start scoring candidates. You can use the built-in 6-criteria standard or customize your own.</p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <button id="btn-create-standard-tpl" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-5 py-2.5 rounded-full transition shadow-lg">Use Standard 6-Criteria Rubric</button>
+          <button id="btn-create-custom-tpl" class="border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-5 py-2.5 rounded-full transition">Build Custom Template</button>
+        </div>
       </div>
     `;
-    document.getElementById('btn-load-defaults-empty')?.addEventListener('click', handleLoadMockData);
+    document.getElementById('btn-create-standard-tpl')?.addEventListener('click', createStandardTemplate);
+    document.getElementById('btn-create-custom-tpl')?.addEventListener('click', () => {
+      editingTemplateId = null;
+      resetFormBuilderDefaults();
+      switchTab('form-builder');
+    });
     return;
   }
 
@@ -627,8 +646,12 @@ const renderAnalytics = () => {
   });
 
   const filtered = candidates.filter((cand) => {
+    const name = (cand.name || '').toLowerCase();
+    const interviewer = (cand.interviewer || '').toLowerCase();
+    const templateTitle = (cand.templateTitle || '').toLowerCase();
+    const query = filterQuery.toLowerCase();
     const matchesRole = filterRole === 'All' || cand.role === filterRole;
-    const matchesSearch = cand.name.toLowerCase().includes(filterQuery.toLowerCase()) || cand.interviewer.toLowerCase().includes(filterQuery.toLowerCase()) || cand.templateTitle.toLowerCase().includes(filterQuery.toLowerCase());
+    const matchesSearch = !query || name.includes(query) || interviewer.includes(query) || templateTitle.includes(query);
     return matchesRole && matchesSearch;
   });
 
@@ -640,7 +663,11 @@ const renderAnalytics = () => {
   candidatesTableBody.innerHTML = '';
 
   if (filtered.length === 0) {
-    candidatesTableBody.innerHTML = `<tr><td colspan="7" class="p-12 text-center text-xs text-slate-400">No matching search entries found.</td></tr>`;
+    const emptyMsg = candidates.length === 0
+      ? 'No evaluations yet. Complete a live interview to see results here.'
+      : 'No candidates match your search or filter.';
+    candidatesTableBody.innerHTML = `<tr><td colspan="7" class="p-12 text-center text-xs text-slate-400">${emptyMsg}</td></tr>`;
+    renderDistributionChart([], [], [], []);
     return;
   }
 
@@ -681,7 +708,7 @@ const renderAnalytics = () => {
 const renderDistributionChart = (filteredList, topT, midT, lowT) => {
   distributionChartWrapper.innerHTML = '';
   if (filteredList.length === 0) {
-    distributionChartWrapper.innerHTML = `<p class="text-xs text-slate-400 py-4 text-center">No calibrated candidates found inside the directory database.</p>`;
+    distributionChartWrapper.innerHTML = `<p class="text-xs text-slate-400 py-4 text-center">Complete interviews to see performance distribution.</p>`;
     return;
   }
 
@@ -725,18 +752,35 @@ const handleDeleteTemplate = async (id) => {
 
 templateEditorForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!user) {
-    showToast('Syncing auth session, please wait.', 'error');
+  if (!user || !currentWorkspace) {
+    showToast('Sign in to a workspace before saving.', 'error');
+    return;
+  }
+
+  const weightSum = builderCriteria.reduce((acc, c) => acc + Number(c.weight || 0), 0);
+  if (weightSum !== 100) {
+    showToast(`Criteria weights must total 100% (currently ${weightSum}%).`, 'error');
+    return;
+  }
+
+  if (builderCriteria.some(c => !c.name?.trim())) {
+    showToast('Every criteria needs a name before publishing.', 'error');
+    return;
+  }
+
+  const title = document.getElementById('tpl-title').value.trim();
+  if (!title) {
+    showToast('Please enter a form title.', 'error');
     return;
   }
 
   const templateData = {
-    title: document.getElementById('tpl-title').value,
-    description: document.getElementById('tpl-desc').value,
-    role: document.getElementById('tpl-role').value,
+    title,
+    description: document.getElementById('tpl-desc').value.trim(),
+    role: document.getElementById('tpl-role').value.trim(),
     criteria: builderCriteria,
     updatedAt: new Date().toISOString(),
-    creator: user?.uid || 'anonymous'
+    creator: user.uid
   };
 
   try {
@@ -766,59 +810,82 @@ const handleStartInterview = (template) => {
   candidateScores = {};
   candidateNotes = {};
   template.criteria.forEach((c) => {
-    candidateScores[c.id] = 'S';
     candidateNotes[c.id] = '';
   });
 
-  likertResponses = {
-    'likert-1': 'Agree', 'likert-2': 'Agree', 'likert-3': 'Agree', 'likert-4': 'Agree', 'likert-5': 'Agree', 'likert-6': 'Agree'
-  };
+  likertResponses = {};
 
   document.getElementById('candidate-strengths').value = '';
   document.getElementById('candidate-weaknesses').value = '';
   document.getElementById('overall-feedback').value = '';
+  document.getElementById('local-scratchpad').value = '';
   interviewDuration = 0;
   clearInterval(timerInterval);
+  updateLiveTimerDisplay(0);
   timerInterval = setInterval(() => {
     interviewDuration++;
-    const formatted = getFormattedTime(interviewDuration);
-    liveTimerLabel.textContent = formatted;
-    document.querySelectorAll('.live-duration-text').forEach((el) => { el.textContent = formatted; });
+    updateLiveTimerDisplay(interviewDuration);
   }, 1000);
 
-  navActiveCandidateName.textContent = 'Candidate Interview';
+  navActiveCandidateName.textContent = 'New interview';
   navActiveAssessmentContainer.classList.remove('hidden');
   renderLiveInterviewSheet();
   switchTab('live-interview');
 };
 
+const updateLiveTimerDisplay = (seconds) => {
+  const formatted = getFormattedTime(seconds);
+  document.querySelectorAll('.live-duration-text').forEach((el) => { el.textContent = formatted; });
+};
+
 document.getElementById('candidate-name').addEventListener('input', (event) => {
-  navActiveCandidateName.textContent = event.target.value || 'Candidate Interview';
+  navActiveCandidateName.textContent = event.target.value.trim() || 'New interview';
 });
 
 document.getElementById('btn-cancel-interview').addEventListener('click', () => {
-  if (window.confirm('Abandon current assessment? This wipes live evaluations.')) cleanupActiveInterview();
+  if (window.confirm('Discard this interview? Unsaved ratings will be lost.')) cleanupActiveInterview();
 });
 
-const cleanupActiveInterview = () => {
+const cleanupActiveInterview = (silent = false) => {
   clearInterval(timerInterval);
+  timerInterval = null;
   activeInterviewTemplate = null;
+  candidateScores = {};
+  candidateNotes = {};
+  likertResponses = {};
+  interviewDuration = 0;
   navActiveAssessmentContainer.classList.add('hidden');
-  switchTab('dashboard');
+  if (!silent) switchTab('dashboard');
 };
 
 document.getElementById('live-interview-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!user) {
-    showToast('Connection pending. Please try again in a few moments.', 'error');
+  if (!user || !currentWorkspace) {
+    showToast('Workspace connection lost. Please sign in again.', 'error');
     return;
   }
 
+  const candidateName = document.getElementById('candidate-name').value.trim();
+  if (!candidateName) {
+    showToast('Please enter the candidate\'s name before saving.', 'error');
+    document.getElementById('candidate-name').focus();
+    return;
+  }
+
+  const unratedCriteria = activeInterviewTemplate.criteria.filter(c => !candidateScores[c.id]);
+  if (unratedCriteria.length > 0) {
+    showToast(`Please rate all criteria (${unratedCriteria.length} remaining).`, 'error');
+    return;
+  }
+
+  const submitBtn = event.target.querySelector('[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+
   const calculatedScore = evaluateOverallPerformanceScore(candidateScores, activeInterviewTemplate.criteria, likertResponses);
   const candidateData = {
-    name: document.getElementById('candidate-name').value,
+    name: candidateName,
     role: document.getElementById('candidate-role').value || activeInterviewTemplate.role || 'General Profile',
-    interviewer: document.getElementById('interviewer-name').value || 'Anonymous Interviewer',
+    interviewer: document.getElementById('interviewer-name').value.trim() || '—',
     date: document.getElementById('date-of-interview').value,
     templateTitle: activeInterviewTemplate.title,
     scores: candidateScores,
@@ -835,17 +902,19 @@ document.getElementById('live-interview-form').addEventListener('submit', async 
   try {
     const candidatesCollection = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates');
     await addDoc(candidatesCollection, candidateData);
-    showToast(`${candidateData.name} evaluated and calibrated successfully!`);
+    showToast(`${candidateData.name} saved — score ${calculatedScore}%`);
     cleanupActiveInterview();
     switchTab('class-analytics');
   } catch (err) {
     console.error(err);
-    showToast('Error saving candidate evaluation.', 'error');
+    showToast('Could not save evaluation. Please try again.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 });
 
 const handleDeleteCandidate = async (id) => {
-  if (!window.confirm('Remove candidate trial evaluation report permanently?')) return;
+  if (!window.confirm('Delete this evaluation permanently?')) return;
   try {
     await deleteDoc(doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates', id));
     showToast('Evaluation report deleted.');
@@ -876,82 +945,29 @@ analyticsRoleFilter.addEventListener('change', (event) => {
   renderAnalytics();
 });
 
-const handleLoadMockData = async () => {
-  if (!user) return;
+const createStandardTemplate = async () => {
+  if (!user || !currentWorkspace) {
+    showToast('Sign in to a workspace first.', 'error');
+    return;
+  }
+  if (templates.length > 0) return;
+
   try {
     const templateCollectionRef = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'templates');
-    const defaultForm = {
-      title: 'Standard Mock Interview Evaluation Form',
-      description: 'Official structured rubric containing both Image 1 and Image 2 standards: NS/S/VS checklist ratings, Likert indicator checklists, Strengths/Weaknesses fields, and overall calibration metric outputs.',
-      role: 'Software Developer Candidate',
-      criteria: [...MANDATORY_CRITERIA_DEFAULTS],
+    await addDoc(templateCollectionRef, {
+      title: 'Standard Interview Evaluation',
+      description: 'Six core criteria with NS/S/VS ratings and Likert checklist questions.',
+      role: '',
+      criteria: MANDATORY_CRITERIA_DEFAULTS.map(c => ({ ...c })),
       updatedAt: new Date().toISOString(),
-      creator: 'system'
-    };
-    await addDoc(templateCollectionRef, defaultForm);
-    const candidatesCollectionRef = collection(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates');
-    const mockCandidates = [
-      {
-        name: 'Rohan Varma',
-        role: 'Software Developer Candidate',
-        interviewer: 'Mr. Alex Mercer',
-        date: new Date(Date.now() - 3600000 * 24).toISOString().split('T')[0],
-        templateTitle: 'Standard Mock Interview Evaluation Form',
-        scores: { 'crit-comm-verbal': 'VS', 'crit-comm-nonverbal': 'VS', 'crit-interest': 'S', 'crit-presentation': 'VS', 'crit-resume': 'S', 'crit-problem-solving': 'VS' },
-        notes: { 'crit-comm-verbal': 'Spoke cleanly and persuasively.', 'crit-problem-solving': 'Solved the architectural database optimization cleanly.' },
-        likertAnswers: { 'likert-1': 'Strongly Agree', 'likert-2': 'Strongly Agree', 'likert-3': 'Agree', 'likert-4': 'Strongly Agree', 'likert-5': 'Strongly Agree', 'likert-6': 'Strongly Agree' },
-        strengths: 'Outstanding problem solving, rapid delivery of clean algorithms under pressure, and crisp verbal presentation.',
-        weaknesses: 'Slightly passive on asking about internal corporate culture segments.',
-        overallFeedback: 'Stellar performance overall, highly recommended. Possesses precise skills matched for the team leader position.',
-        durationSeconds: 2450,
-        calculatedScore: 92.5,
-        evaluatedAt: new Date().toISOString()
-      },
-      {
-        name: 'Simran Kaur',
-        role: 'Software Developer Candidate',
-        interviewer: 'Ms. Elena Rostova',
-        date: new Date().toISOString().split('T')[0],
-        templateTitle: 'Standard Mock Interview Evaluation Form',
-        scores: { 'crit-comm-verbal': 'S', 'crit-comm-nonverbal': 'S', 'crit-interest': 'NS', 'crit-presentation': 'S', 'crit-resume': 'S', 'crit-problem-solving': 'S' },
-        notes: { 'crit-interest': 'Had low awareness about current product lines.' },
-        likertAnswers: { 'likert-1': 'Agree', 'likert-2': 'Disagree', 'likert-3': 'Agree', 'likert-4': 'Agree', 'likert-5': 'Agree', 'likert-6': 'Agree' },
-        strengths: 'Has valid technical baseline, comfortable with medium difficulty coding questions.',
-        weaknesses: 'Lacks core organization context and product excitement.',
-        overallFeedback: 'Good solid developer, but requires excitement calibration and background review.',
-        durationSeconds: 1800,
-        calculatedScore: 65.0,
-        evaluatedAt: new Date().toISOString()
-      },
-      {
-        name: 'Daniel Craig',
-        role: 'Software Developer Candidate',
-        interviewer: 'Mr. Alex Mercer',
-        date: new Date(Date.now() - 3600000 * 48).toISOString().split('T')[0],
-        templateTitle: 'Standard Mock Interview Evaluation Form',
-        scores: { 'crit-comm-verbal': 'NS', 'crit-comm-nonverbal': 'NS', 'crit-interest': 'NS', 'crit-presentation': 'NS', 'crit-resume': 'NS', 'crit-problem-solving': 'NS' },
-        notes: { 'crit-problem-solving': 'Could not outline high scale layout requirements.' },
-        likertAnswers: { 'likert-1': 'Disagree', 'likert-2': 'Disagree', 'likert-3': 'Disagree', 'likert-4': 'Could not determine', 'likert-5': 'Disagree', 'likert-6': 'Disagree' },
-        strengths: 'Average theoretical definitions.',
-        weaknesses: 'Significant gaps in coding execution, high level design, and professional etiquette.',
-        overallFeedback: 'Does not meet the baseline criteria for position title. Significant remediation recommended.',
-        durationSeconds: 1550,
-        calculatedScore: 32.0,
-        evaluatedAt: new Date().toISOString()
-      }
-    ];
-
-    for (const cand of mockCandidates) {
-      await addDoc(candidatesCollectionRef, cand);
-    }
-    showToast('Standard Mock Evaluation Template & Candidates populated successfully!');
+      creator: user.uid
+    });
+    showToast('Standard rubric created. Launch an assessment when ready.');
   } catch (err) {
     console.error(err);
-    showToast('Error populating defaults.', 'error');
+    showToast('Could not create template. Please try again.', 'error');
   }
 };
-
-btnMockLoader.addEventListener('click', handleLoadMockData);
 
 const initAuth = async () => {
   try {
@@ -962,11 +978,10 @@ const initAuth = async () => {
     }
   } catch (err) {
     console.error('Auth initialization failure: ', err);
-    showToast('Connected in offline preview status. Data is temporary.', 'info');
+    showToast('Running in offline mode — data won\'t sync until connected.', 'info');
     user = { uid: 'anonymous-local-dev-user' };
-    authStatusLabel.textContent = 'Offline Status';
+    authStatusLabel.textContent = 'Offline';
     setLoginAuthReady(true);
-    setupFirestoreSync();
   }
 };
 
@@ -975,19 +990,41 @@ initAuth();
 onAuthStateChanged(auth, (u) => {
   if (u) {
     user = u;
-    authStatusLabel.textContent = 'Database Active';
-    btnMockLoader.classList.remove('hidden');
+    authStatusLabel.textContent = 'Connected';
     setLoginAuthReady(true);
-    setupFirestoreSync();
+    if (currentWorkspace) setupFirestoreSync();
   } else {
     user = null;
-    authStatusLabel.textContent = 'Unauthenticated';
+    authStatusLabel.textContent = 'Disconnected';
     setLoginAuthReady(false);
   }
 });
 
 let unsubscribeTemplates = null;
 let unsubscribeCandidates = null;
+let legacyCleanupDone = false;
+
+const LEGACY_SAMPLE_CANDIDATE_NAMES = new Set(['Rohan Varma', 'Simran Kaur', 'Daniel Craig']);
+
+const removeLegacySampleCandidates = async () => {
+  if (!currentWorkspace || !user || legacyCleanupDone) return;
+  const legacy = candidates.filter((c) => LEGACY_SAMPLE_CANDIDATE_NAMES.has(c.name));
+  if (legacy.length === 0) {
+    legacyCleanupDone = true;
+    return;
+  }
+  try {
+    await Promise.all(
+      legacy.map((c) =>
+        deleteDoc(doc(db, 'artifacts', app_id, 'public', 'workspaces', currentWorkspace, 'candidates', c.id))
+      )
+    );
+    showToast(`Removed ${legacy.length} old sample evaluation${legacy.length > 1 ? 's' : ''} from this workspace.`, 'info');
+  } catch (err) {
+    console.error('Legacy cleanup failed:', err);
+  }
+  legacyCleanupDone = true;
+};
 
 const setupFirestoreSync = () => {
   if (!currentWorkspace) return;
@@ -1000,16 +1037,22 @@ const setupFirestoreSync = () => {
 
   unsubscribeTemplates = onSnapshot(templatesCollection, (snapshot) => {
     templates = [];
-    snapshot.forEach((doc) => templates.push({ id: doc.id, ...doc.data() }));
-    renderTemplates();
+    snapshot.forEach((docSnap) => templates.push({ id: docSnap.id, ...docSnap.data() }));
+    if (tabDashboardContent && !tabDashboardContent.classList.contains('hidden')) {
+      renderTemplates();
+    }
   }, (error) => {
     console.error('Templates snapshot fetch error:', error);
+    showToast('Could not load templates. Check your connection.', 'error');
   });
 
-  unsubscribeCandidates = onSnapshot(candidatesCollection, (snapshot) => {
+  unsubscribeCandidates = onSnapshot(candidatesCollection, async (snapshot) => {
     candidates = [];
-    snapshot.forEach((doc) => candidates.push({ id: doc.id, ...doc.data() }));
-    renderAnalytics();
+    snapshot.forEach((docSnap) => candidates.push({ id: docSnap.id, ...docSnap.data() }));
+    await removeLegacySampleCandidates();
+    if (tabClassAnalyticsContent && !tabClassAnalyticsContent.classList.contains('hidden')) {
+      renderAnalytics();
+    }
   }, (error) => {
     console.error('Candidates snapshot fetch error:', error);
   });
