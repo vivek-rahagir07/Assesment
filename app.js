@@ -73,6 +73,7 @@ const loginSuccessMsg = document.getElementById('login-success-msg');
 const headerWsBadge = document.getElementById('header-ws-badge');
 const btnSwitchWs = document.getElementById('btn-switch-ws');
 const btnShowWorkspace = document.getElementById('btn-show-workspace');
+const btnShareWs = document.getElementById('btn-share-ws');
 const navDashboard = document.getElementById('nav-dashboard');
 const navFormBuilder = document.getElementById('nav-form-builder');
 const navClassAnalytics = document.getElementById('nav-class-analytics');
@@ -165,13 +166,6 @@ navFormBuilder.addEventListener('click', () => {
 navClassAnalytics.addEventListener('click', () => switchTab('class-analytics'));
 navLiveInterview.addEventListener('click', () => switchTab('live-interview'));
 
-const getTimeGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-};
-
 const LOGIN_TAGLINES = [
   'Where great hiring decisions start — together.',
   'Fair scores. Clear feedback. Better hires.',
@@ -181,21 +175,41 @@ const LOGIN_TAGLINES = [
 
 let taglineIndex = 0;
 
-const initLoginUX = () => {
-  if (loginGreeting) loginGreeting.textContent = getTimeGreeting();
+const typeWriterEffect = async (element, text, speed = 40) => {
+  element.textContent = '';
+  for (let i = 0; i < text.length; i++) {
+    element.textContent += text.charAt(i);
+    await new Promise(r => setTimeout(r, speed));
+  }
+};
 
+const initLoginUX = () => {
   if (loginTagline) {
+    loginTagline.style.borderRight = '2px solid rgba(199, 210, 254, 0.8)';
+    loginTagline.style.paddingRight = '4px';
+    
     setInterval(() => {
-      taglineIndex = (taglineIndex + 1) % LOGIN_TAGLINES.length;
-      loginTagline.style.opacity = '0';
-      loginTagline.style.transform = 'translateY(4px)';
-      setTimeout(() => {
-        loginTagline.textContent = LOGIN_TAGLINES[taglineIndex];
-        loginTagline.style.opacity = '1';
-        loginTagline.style.transform = 'translateY(0)';
-      }, 300);
-    }, 5000);
-    loginTagline.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      loginTagline.style.borderColor = loginTagline.style.borderColor === 'transparent' ? 'rgba(199, 210, 254, 0.8)' : 'transparent';
+    }, 500);
+
+    const playTaglineSequence = async () => {
+      while (true) {
+        await typeWriterEffect(loginTagline, LOGIN_TAGLINES[taglineIndex]);
+        await new Promise(r => setTimeout(r, 4000));
+        
+        let currentText = loginTagline.textContent;
+        while (currentText.length > 0) {
+          currentText = currentText.slice(0, -1);
+          loginTagline.textContent = currentText;
+          await new Promise(r => setTimeout(r, 20));
+        }
+        
+        taglineIndex = (taglineIndex + 1) % LOGIN_TAGLINES.length;
+        await new Promise(r => setTimeout(r, 500));
+      }
+    };
+    
+    setTimeout(playTaglineSequence, 800);
   }
 
   wsNameInput?.addEventListener('input', () => {
@@ -205,6 +219,15 @@ const initLoginUX = () => {
   });
 
   wsPassInput?.addEventListener('input', () => wsErrorMsg.classList.add('hidden'));
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const wsParam = urlParams.get('workspace');
+  if (wsParam && wsNameInput) {
+    wsNameInput.value = wsParam;
+    const wrap = wsNameInput.closest('.field-input-wrap');
+    wrap?.classList.add('is-valid');
+    setTimeout(() => wsPassInput?.focus(), 600);
+  }
 };
 
 const setLoginAuthReady = (ready = true) => {
@@ -309,6 +332,10 @@ const enterWorkspace = (wsName) => {
   loginShell?.classList.add('is-authenticated');
   headerWsBadge.textContent = wsName;
   headerWsBadge.classList.remove('hidden');
+  if (btnShareWs) {
+    btnShareWs.classList.remove('hidden');
+    btnShareWs.classList.add('flex');
+  }
   wsNameInput.value = '';
   wsPassInput.value = '';
   wsErrorMsg.classList.add('hidden');
@@ -328,6 +355,10 @@ btnSwitchWs.addEventListener('click', () => {
   workspaceEntryCard.classList.remove('hidden');
   mainAppContainer.classList.add('hidden');
   loginShell?.classList.remove('is-authenticated');
+  if (btnShareWs) {
+    btnShareWs.classList.add('hidden');
+    btnShareWs.classList.remove('flex');
+  }
   loginSuccessOverlay?.classList.add('hidden');
   setLoginAuthReady(!!user);
   setSubmitLoading(false);
@@ -419,7 +450,7 @@ const renderTemplates = () => {
 
   if (templates.length === 0) {
     templatesGrid.innerHTML = `
-      <div class="bg-white rounded-3xl border border-slate-200 p-12 text-center col-span-full shadow-xl">
+      <div class="bg-white/60 backdrop-blur-xl rounded-3xl border border-white/80 p-12 text-center col-span-full shadow-lg">
         <div class="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-2xl">📋</div>
         <h3 class="text-md font-bold text-slate-900 mb-1">No rubrics yet</h3>
         <p class="text-sm text-slate-500 mb-6 max-w-sm mx-auto">Create your first evaluation template to start scoring candidates. You can use the built-in 6-criteria standard or customize your own.</p>
@@ -440,7 +471,7 @@ const renderTemplates = () => {
 
   templates.forEach((tpl) => {
     const card = document.createElement('div');
-    card.className = 'bg-white p-5 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-between';
+    card.className = 'bg-white/70 backdrop-blur-xl hover:bg-white/90 transition-all duration-300 p-5 rounded-3xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex flex-col justify-between group cursor-default';
 
     let criteriaListHtml = '';
     if (tpl.criteria) {
@@ -467,7 +498,7 @@ const renderTemplates = () => {
           ${criteriaListHtml}
         </div>
       </div>
-      <div class="border-t border-slate-100 pt-4 mt-6 flex justify-between items-center">
+      <div class="border-t border-slate-200/50 pt-4 mt-6 flex justify-between items-center opacity-90 group-hover:opacity-100 transition-opacity">
         <div class="flex space-x-1">
           <button class="btn-edit-tpl p-2 text-slate-500 hover:bg-slate-100 rounded-full" title="Edit template fields">✎</button>
           <button class="btn-delete-tpl p-2 text-rose-500 hover:bg-rose-50 rounded-full" title="Delete template">🗑</button>
@@ -1057,3 +1088,42 @@ const setupFirestoreSync = () => {
     console.error('Candidates snapshot fetch error:', error);
   });
 };
+
+if (btnShareWs) {
+  btnShareWs.addEventListener('click', () => {
+    if (!currentWorkspace) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('workspace', currentWorkspace);
+    if (navigator.share) {
+      navigator.share({
+        title: 'Join my Workspace on TalentCalibrate',
+        text: 'Join my workspace to calibrate interviews together.',
+        url: url.href
+      }).catch(console.error);
+    } else {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url.href).then(() => {
+          showToast('Workspace link copied to clipboard!');
+        });
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = url.href;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showToast('Workspace link copied to clipboard!');
+      }
+    }
+  });
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then((registration) => {
+      console.log('ServiceWorker registration successful with scope: ', registration.scope);
+    }, (error) => {
+      console.log('ServiceWorker registration failed: ', error);
+    });
+  });
+}

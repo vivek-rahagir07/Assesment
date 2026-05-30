@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TalentCalibrate - Structured Interview Evaluator</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="photoes/logo.png" type="image/png" />
+  <link rel="apple-touch-icon" href="photoes/logo.png" />
+  <meta name="theme-color" content="#4f46e5" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -25,21 +29,17 @@
   </div>
 
   <main id="login-shell" class="login-shell relative z-10 mx-auto w-full max-w-5xl px-4 py-8 lg:py-12">
-    <div class="login-card-grid overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_32px_80px_rgba(15,23,42,0.08)]">
+    <div class="login-card-grid overflow-hidden rounded-[1.75rem] border border-white/60 bg-white/70 backdrop-blur-2xl shadow-[0_32px_80px_rgba(15,23,42,0.08)]">
       <section id="opening-panel" class="brand-panel relative flex flex-col justify-between p-8 sm:p-10 lg:p-12">
         <div class="brand-panel-glow" aria-hidden="true"></div>
         <div class="brand-shimmer" aria-hidden="true"></div>
         <div class="relative z-10">
-          <div class="brand-logo animate-brand-logo">
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-              <rect width="28" height="28" rx="8" fill="rgba(255,255,255,0.15)"/>
-              <path class="logo-chart-line" d="M8 18l4-8 4 5 4-9" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+          <div class="mb-6 animate-in" style="--delay: 0.1s">
+            <img src="photoes/logo.png" alt="Logo" class="h-20 w-auto object-contain drop-shadow-2xl animate-brand-logo" />
           </div>
-          <p id="login-greeting" class="login-greeting animate-in" style="--delay: 0.1s">Good morning</p>
           <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-white sm:text-4xl animate-in" style="--delay: 0.2s">TalentCalibrate</h1>
-          <p class="mt-3 max-w-xs text-sm leading-relaxed text-indigo-100/90 animate-in" style="--delay: 0.35s">
-            <span id="login-tagline">Where great hiring decisions start — together.</span>
+          <p class="mt-3 max-w-xs text-sm leading-relaxed text-indigo-100/90 animate-in min-h-[3rem]" style="--delay: 0.35s">
+            <span id="login-tagline" class="inline-block">Where great hiring decisions start — together.</span>
           </p>
         </div>
 
@@ -141,15 +141,22 @@
           </div>
         </div>
 
-      <div id="main-app-container" class="hidden">
-        <header class="bg-white border border-slate-200/60 rounded-3xl p-5 shadow-xl">
+      <div id="main-app-container" class="hidden relative z-10 w-full max-w-7xl mx-auto px-4 py-8">
+        <header class="bg-white/70 backdrop-blur-xl border border-white/80 rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] mb-8 transition-all hover:bg-white/80">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-center gap-3">
-              <div class="grid h-12 w-12 place-items-center rounded-3xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/10">
-                <span class="text-xl">★</span>
+              <div class="flex h-12 w-12 items-center justify-center rounded-3xl bg-white shadow-lg shadow-indigo-500/10 p-1 border border-slate-100">
+                <img src="photoes/logo.png" alt="TalentCalibrate Logo" class="h-full w-full object-contain" />
               </div>
               <div>
-                <h1 class="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">TalentCalibrate <span id="header-ws-badge" class="hidden rounded-full bg-indigo-100 px-3 py-1 text-[10px] font-semibold uppercase text-indigo-800"></span></h1>
+                <h1 class="text-xl font-bold text-slate-900 tracking-tight flex flex-wrap items-center gap-2">
+                  TalentCalibrate 
+                  <span id="header-ws-badge" class="hidden rounded-full bg-indigo-100 px-3 py-1 text-[10px] font-semibold uppercase text-indigo-800"></span>
+                  <button id="btn-share-ws" class="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase text-emerald-700 transition hover:bg-emerald-100 items-center gap-1 shadow-sm" title="Share Workspace Link">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                    Share
+                  </button>
+                </h1>
                 <p class="text-xs text-slate-500">Structured interview evaluation and team calibration.</p>
               </div>
             </div>
@@ -164,9 +171,9 @@
           </div>
         </header>
 
-        <div class="flex flex-col gap-6 lg:flex-row">
+        <div class="flex flex-col gap-8 lg:flex-row">
           <aside class="w-full lg:w-72 flex-shrink-0">
-            <nav class="space-y-3 rounded-3xl border border-slate-200/60 bg-white/90 p-5 shadow-xl backdrop-blur-xl">
+            <nav class="space-y-3 rounded-3xl border border-white/80 bg-white/60 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-xl transition-all hover:bg-white/70">
               <p class="text-xs uppercase tracking-[0.35em] text-slate-400">Main menu</p>
               <button id="nav-dashboard" class="w-full flex items-center gap-3 rounded-3xl bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 transition">Evaluation Rubrics</button>
               <button id="nav-form-builder" class="w-full flex items-center gap-3 rounded-3xl px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Customize Rubrics Form</button>
@@ -206,7 +213,7 @@
               <div id="templates-grid" class="grid gap-4 md:grid-cols-2"></div>
             </section>
 
-            <section id="tab-form-builder-content" class="hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-xl space-y-6">
+            <section id="tab-form-builder-content" class="hidden rounded-3xl border border-white/80 bg-white/70 backdrop-blur-xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.06)] space-y-6">
               <div>
                 <h3 id="form-builder-header-title" class="text-xl font-bold text-slate-900">Create Custom Interview Evaluation Blueprint</h3>
                 <p class="text-xs text-slate-500 mt-1">Adjust default parameters. Standard questions are baked in by default.</p>
@@ -250,7 +257,7 @@
             </section>
 
             <section id="tab-live-interview-content" class="hidden grid gap-6 lg:grid-cols-12">
-              <form id="live-interview-form" class="lg:col-span-8 space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+              <form id="live-interview-form" class="lg:col-span-8 space-y-6 rounded-3xl border border-white/80 bg-white/70 backdrop-blur-xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
                 <div class="border-b border-slate-200 pb-4">
                   <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -330,7 +337,7 @@
               </form>
 
               <div class="lg:col-span-4 space-y-4">
-                <div class="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-xl sticky top-24">
+                <div class="rounded-3xl border border-amber-200/60 bg-amber-50/80 backdrop-blur-lg p-5 shadow-lg sticky top-24">
                   <h4 class="font-bold text-amber-900 text-xs uppercase mb-2">💡 Quick Evaluator Notepad</h4>
                   <p class="text-[11px] text-amber-700 mb-4">Scribble quick bullet points. This area is isolated for your local workspace.</p>
                   <textarea id="local-scratchpad" rows="12" class="w-full rounded-3xl border border-amber-200 bg-white p-3 text-xs font-mono focus:outline-none" placeholder="Jot quick notes here — only visible on your screen during this session."></textarea>
@@ -347,7 +354,7 @@
             </section>
 
             <section id="tab-class-analytics-content" class="hidden space-y-6">
-              <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-xl space-y-4">
+              <div class="rounded-3xl border border-white/80 bg-white/70 backdrop-blur-xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] space-y-4">
                 <div>
                   <h3 class="font-bold text-slate-900">Class Performance Cutoffs</h3>
                   <p class="text-xs text-slate-500">Tune grading thresholds to sort candidates into Top, Mid, and Low performance categories.</p>
@@ -370,12 +377,12 @@
                 </div>
               </div>
 
-              <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl space-y-4">
+              <div class="rounded-3xl border border-white/80 bg-white/70 backdrop-blur-xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.06)] space-y-4">
                 <h4 class="font-bold text-slate-900">Active Evaluated Candidate Distribution</h4>
                 <div id="distribution-chart-wrapper"></div>
               </div>
 
-              <div class="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xl">
+              <div class="rounded-3xl border border-white/80 bg-white/70 backdrop-blur-xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
                 <div class="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h4 class="font-bold text-slate-900 text-sm">Class Calibration Matrix Table</h4>
