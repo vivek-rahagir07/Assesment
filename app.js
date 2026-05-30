@@ -1818,15 +1818,24 @@ const renderLiveInterviewSheet = () => {
     const row = document.createElement('div');
     row.className = 'criteria-card';
     row.innerHTML = `
-      <div class="criteria-card__header">
-        <div class="criteria-card__meta">
+      <div class="criteria-card__header flex items-center justify-between gap-4">
+        <div class="criteria-card__meta flex items-center gap-3 flex-1 min-w-0">
           <span class="criteria-card__num">${idx + 1}</span>
-          <div>
-            <div class="criteria-card__title">${c.name}</div>
-            ${c.desc ? `<div class="criteria-card__desc">${c.desc}</div>` : ''}
+          <div class="flex-1 min-w-0">
+            <input type="text" class="live-crit-name-input font-bold text-slate-900 text-sm bg-transparent border-b border-dashed border-slate-300 hover:border-slate-500 focus:border-indigo-500 focus:outline-none w-full"
+              value="${c.name}" placeholder="Criteria Name" title="Click to rename criteria">
+            <input type="text" class="live-crit-desc-input text-xs text-slate-500 bg-transparent border-b border-dashed border-slate-200 hover:border-slate-400 focus:border-indigo-500 focus:outline-none w-full mt-1 italic"
+              value="${c.desc || ''}" placeholder="Explain expectations or guidelines..." title="Click to edit explanation">
           </div>
         </div>
-        ${c.category ? `<span class="criteria-card__category">${c.category}</span>` : ''}
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <div class="flex items-center gap-1 text-xs text-slate-500 bg-slate-100/90 border border-slate-200 px-2.5 py-1 rounded-full shadow-sm hover:bg-slate-200 transition-colors">
+            <span class="font-bold text-[9px] uppercase tracking-wider text-slate-400">Weight:</span>
+            <input type="number" class="live-crit-weight-input w-9 text-center bg-transparent focus:outline-none font-bold text-slate-700 tabular-nums"
+              min="0" max="100" value="${c.weight}" title="Adjust criteria weight percentage">%
+          </div>
+          <button type="button" class="btn-delete-live-crit flex h-7 w-7 items-center justify-center text-rose-500 hover:bg-rose-50 rounded-full border border-transparent hover:border-rose-200 transition font-bold" title="Remove this criteria card">✕</button>
+        </div>
       </div>
 
       <div class="criteria-card__ratings">
@@ -1860,6 +1869,28 @@ const renderLiveInterviewSheet = () => {
       </div>
     `;
 
+    row.querySelector('.live-crit-name-input').addEventListener('input', (e) => {
+      c.name = e.target.value;
+    });
+
+    row.querySelector('.live-crit-desc-input').addEventListener('input', (e) => {
+      c.desc = e.target.value;
+    });
+
+    row.querySelector('.live-crit-weight-input').addEventListener('input', (e) => {
+      c.weight = Number(e.target.value || 0);
+      updateLiveComputedScore();
+    });
+
+    row.querySelector('.btn-delete-live-crit').addEventListener('click', () => {
+      if (activeInterviewTemplate.criteria.length <= 1) {
+        showToast('You must keep at least one assessment criteria.', 'error');
+        return;
+      }
+      activeInterviewTemplate.criteria.splice(idx, 1);
+      renderLiveInterviewSheet();
+    });
+
     row.querySelector('.criteria-note-input').addEventListener('input', (e) => {
       candidateNotes[c.id] = e.target.value;
     });
@@ -1876,6 +1907,25 @@ const renderLiveInterviewSheet = () => {
 
     criteriaContainer.appendChild(row);
   });
+
+  const liveAddBtn = document.getElementById('btn-live-add-criteria');
+  if (liveAddBtn && !liveAddBtn.dataset.bound) {
+    liveAddBtn.dataset.bound = "true";
+    liveAddBtn.addEventListener('click', () => {
+      const newId = `crit-live-${Date.now()}`;
+      activeInterviewTemplate.criteria.push({
+        id: newId,
+        name: `Custom Focus Field ${activeInterviewTemplate.criteria.length + 1}`,
+        category: 'Custom Skill',
+        maxScore: 3,
+        weight: 10,
+        desc: ''
+      });
+      candidateNotes[newId] = '';
+      candidateScores[newId] = '';
+      renderLiveInterviewSheet();
+    });
+  }
 
   const likertContainer = document.getElementById('live-likert-questions-container');
   likertContainer.innerHTML = '';
