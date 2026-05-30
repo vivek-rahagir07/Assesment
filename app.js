@@ -2475,12 +2475,94 @@ if (btnShareWs) {
   });
 }
 
+// ==========================================
+// PWA SETUP, SERVICE WORKER & OFFLINE METRICS
+// ==========================================
+
+// 1. Robust Service Worker Registration
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then((registration) => {
-      console.log('ServiceWorker registration successful with scope: ', registration.scope);
-    }, (error) => {
-      console.log('ServiceWorker registration failed: ', error);
-    });
+  const registerSW = () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then((registration) => {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      })
+      .catch((error) => {
+        console.log('ServiceWorker registration failed: ', error);
+      });
+  };
+
+  if (document.readyState === 'complete') {
+    registerSW();
+  } else {
+    window.addEventListener('load', registerSW);
+  }
+}
+
+// 2. Custom A2HS (Add to Home Screen) Install Prompt
+let deferredPrompt;
+const btnInstallPwa = document.getElementById('btn-install-pwa');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevent the mini-infobar from appearing on mobile
+  e.preventDefault();
+  // Stash the event so it can be triggered later.
+  deferredPrompt = e;
+  // Update UI notify the user they can install the PWA
+  if (btnInstallPwa) {
+    btnInstallPwa.classList.remove('hidden');
+    btnInstallPwa.classList.add('inline-flex');
+  }
+});
+
+if (btnInstallPwa) {
+  btnInstallPwa.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`PWA install prompt response: ${outcome}`);
+    // We've used the prompt, and can't use it again
+    deferredPrompt = null;
+    // Hide the install button
+    btnInstallPwa.classList.add('hidden');
+    btnInstallPwa.classList.remove('inline-flex');
   });
 }
+
+window.addEventListener('appinstalled', (evt) => {
+  console.log('TalentCalibrate PWA was installed successfully!');
+  if (btnInstallPwa) {
+    btnInstallPwa.classList.add('hidden');
+    btnInstallPwa.classList.remove('inline-flex');
+  }
+});
+
+// 3. Online/Offline Toast Notifications
+const offlineToast = document.getElementById('offline-toast');
+
+const showOfflineToast = () => {
+  if (offlineToast) {
+    offlineToast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+    offlineToast.classList.add('translate-y-0', 'opacity-100');
+  }
+};
+
+const hideOfflineToast = () => {
+  if (offlineToast) {
+    offlineToast.classList.remove('translate-y-0', 'opacity-100');
+    offlineToast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+  }
+};
+
+window.addEventListener('offline', showOfflineToast);
+window.addEventListener('online', () => {
+  hideOfflineToast();
+  showToast('You are back online! Syncing records...');
+});
+
+// Check status on startup
+if (!navigator.onLine) {
+  showOfflineToast();
+}
+

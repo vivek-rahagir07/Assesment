@@ -30,14 +30,40 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // Only handle GET requests and http/https protocols
+  if (e.request.method !== 'GET' || !e.request.url.startsWith('http')) {
+    return;
+  }
+
+  // Bypass Firestore, Firebase Auth, and Database API calls completely
+  const url = e.request.url;
+  if (
+    url.includes('firestore.googleapis.com') ||
+    url.includes('firebaseio.com') ||
+    url.includes('identitytoolkit.googleapis.com') ||
+    url.includes('securetoken.googleapis.com')
+  ) {
+    return;
+  }
+
   e.respondWith(
-    caches.match(e.request).then((response) => {
-      if (response) return response;
-      return fetch(e.request).then((fetchRes) => {
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(e.request, fetchRes.clone());
-          return fetchRes;
-        });
+    caches.match(e.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      return fetch(e.request).then((networkResponse) => {
+        // Only cache valid standard GET responses
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      }).catch((err) => {
+        console.warn('[ServiceWorker] Fetch failed for:', url, err);
+        // Fail silently or return standard offline response
       });
     })
   );
