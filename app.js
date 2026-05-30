@@ -1833,16 +1833,17 @@ const renderLiveInterviewSheet = () => {
         <span class="criteria-card__ratings-label">Rating</span>
         <div class="rating-btn-group">
           ${[
-            { rate: 'NS', label: 'Not Satisfactory', icon: '✕' },
-            { rate: 'S',  label: 'Satisfactory',     icon: '~' },
-            { rate: 'VS', label: 'Very Satisfactory', icon: '✓' },
-            { rate: 'NA', label: 'Not Applicable',    icon: '—' }
-          ].map(({ rate, label, icon }) => `
+            { rate: 'NS', label: 'Not Satisfactory'  },
+            { rate: 'S',  label: 'Satisfactory'      },
+            { rate: 'VS', label: 'Very Satisfactory'  },
+            { rate: 'NA', label: 'Not Applicable'    }
+          ].map(({ rate, label }) => `
             <button type="button" data-rate="${rate}"
               class="rating-btn rating-btn--${rate.toLowerCase()} ${candidateScores[c.id] === rate ? 'is-selected' : ''}"
               title="${label}" aria-label="${label}">
               <span class="rating-btn__abbr">${rate}</span>
-              <span class="rating-btn__icon" aria-hidden="true">${icon}</span>
+              <span class="rating-btn__sep" aria-hidden="true">·</span>
+              <span class="rating-btn__label">${label}</span>
             </button>
           `).join('')}
         </div>
