@@ -81,24 +81,48 @@
       </section>
 
       <section id="workspace-panel" class="login-panel p-8 sm:p-10 lg:p-12">
-        <div id="workspace-entry" class="login-form-wrap mx-auto w-full max-w-sm">
+        <!-- Initial Options: Existing or Create New -->
+        <div id="workspace-options" class="login-form-wrap mx-auto w-full max-w-sm">
+          <div class="login-form-header animate-in" style="--delay: 0.25s">
+            <h2 class="login-title">Welcome to TalentCalibrate</h2>
+            <p class="login-subtitle">What would you like to do?</p>
+          </div>
+
+          <div class="space-y-3 animate-in" style="--delay: 0.35s">
+            <button type="button" id="btn-existing-workspace" class="w-full rounded-3xl border-2 border-indigo-500 bg-white px-6 py-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" class="inline mr-2" style="vertical-align: -2px;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+              Access Existing Workspace
+            </button>
+            <button type="button" id="btn-create-workspace" class="w-full rounded-3xl bg-indigo-600 px-6 py-4 text-sm font-semibold text-white transition hover:bg-indigo-700">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" class="inline mr-2" style="vertical-align: -2px;"><path d="M12 5v14M5 12h14"/></svg>
+              Create New Workspace
+            </button>
+          </div>
+        </div>
+
+        <!-- Existing Workspace Entry Form -->
+        <div id="workspace-entry-existing" class="login-form-wrap mx-auto w-full max-w-sm hidden">
+          <button type="button" id="btn-back-to-options" class="mb-4 text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            Back
+          </button>
           <div id="login-auth-pill" class="login-auth-pill login-auth-pill--pending animate-in" style="--delay: 0.15s" role="status">
             <span class="login-auth-dot"></span>
             <span id="login-auth-label">Connecting you securely…</span>
           </div>
 
           <div class="login-form-header animate-in" style="--delay: 0.25s">
-            <p class="login-eyebrow">Your workspace</p>
-            <h2 class="login-title">Almost there — just sign in</h2>
-            <p class="login-subtitle">Pick any name and password. Returning? We'll open your space. New here? We'll set one up for you.</p>
+            <p class="login-eyebrow">Existing workspace</p>
+            <h2 class="login-title">Sign in to your workspace</h2>
+            <p class="login-subtitle">Enter your workspace name and password to continue.</p>
           </div>
 
-          <form id="workspace-form" class="login-form" novalidate>
+          <form id="workspace-form-existing" class="login-form" novalidate>
             <div class="field-group animate-in" style="--delay: 0.38s">
-              <label for="ws-name" class="field-label">What should we call your workspace?</label>
+              <label for="ws-name-existing" class="field-label">Workspace name</label>
               <div class="field-input-wrap">
                 <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                <input type="text" id="ws-name" required autofocus autocomplete="organization" class="field-input" placeholder="e.g. Engineering_Q3" />
+                <input type="text" id="ws-name-existing" required autofocus autocomplete="organization" class="field-input" placeholder="e.g. Engineering_Q3" />
                 <span class="field-check" aria-hidden="true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                 </span>
@@ -106,21 +130,21 @@
             </div>
 
             <div class="field-group animate-in" style="--delay: 0.5s">
-              <label for="ws-pass" class="field-label">Choose a password</label>
+              <label for="ws-pass-existing" class="field-label">Password</label>
               <div class="field-input-wrap">
                 <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                <input type="password" id="ws-pass" required autocomplete="current-password" class="field-input field-input-password" placeholder="Something you'll remember" />
-                <button type="button" id="btn-toggle-pass" class="field-toggle" aria-label="Show password">
+                <input type="password" id="ws-pass-existing" required autocomplete="current-password" class="field-input field-input-password" placeholder="Your password" />
+                <button type="button" id="btn-toggle-pass-existing" class="field-toggle" aria-label="Show password">
                   <svg class="icon-show" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                   <svg class="icon-hide hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                 </button>
               </div>
             </div>
 
-            <div id="ws-error-msg" class="login-error hidden" role="alert"></div>
+            <div id="ws-error-msg-existing" class="login-error hidden" role="alert"></div>
 
-            <button type="submit" id="btn-ws-submit" class="login-submit animate-in" style="--delay: 0.62s">
-              <span class="login-submit-text">Enter workspace</span>
+            <button type="submit" id="btn-ws-submit-existing" class="login-submit animate-in" style="--delay: 0.62s">
+              <span class="login-submit-text">Sign In</span>
               <span class="login-submit-loader hidden" aria-hidden="true"></span>
               <svg class="login-submit-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </button>
@@ -128,7 +152,58 @@
 
           <p class="login-footnote animate-in" style="--delay: 0.75s">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-            Only people with your password can join this workspace.
+            You must have the correct password to access an existing workspace.
+          </p>
+        </div>
+
+        <!-- Create New Workspace Form -->
+        <div id="workspace-entry-new" class="login-form-wrap mx-auto w-full max-w-sm hidden">
+          <button type="button" id="btn-back-to-options-new" class="mb-4 text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            Back
+          </button>
+          <div class="login-form-header animate-in" style="--delay: 0.25s">
+            <p class="login-eyebrow">New workspace</p>
+            <h2 class="login-title">Create your workspace</h2>
+            <p class="login-subtitle">Set a unique name and secure password for your new workspace.</p>
+          </div>
+
+          <form id="workspace-form-new" class="login-form" novalidate>
+            <div class="field-group animate-in" style="--delay: 0.38s">
+              <label for="ws-name-new" class="field-label">Choose a workspace name</label>
+              <div class="field-input-wrap">
+                <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <input type="text" id="ws-name-new" required autofocus autocomplete="organization" class="field-input" placeholder="e.g. Engineering_Q3" />
+                <span class="field-check" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </span>
+              </div>
+            </div>
+
+            <div class="field-group animate-in" style="--delay: 0.5s">
+              <label for="ws-pass-new" class="field-label">Create a password</label>
+              <div class="field-input-wrap">
+                <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                <input type="password" id="ws-pass-new" required autocomplete="new-password" class="field-input field-input-password" placeholder="Something you'll remember" />
+                <button type="button" id="btn-toggle-pass-new" class="field-toggle" aria-label="Show password">
+                  <svg class="icon-show" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="icon-hide hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div id="ws-error-msg-new" class="login-error hidden" role="alert"></div>
+
+            <button type="submit" id="btn-ws-submit-new" class="login-submit animate-in" style="--delay: 0.62s">
+              <span class="login-submit-text">Create Workspace</span>
+              <span class="login-submit-loader hidden" aria-hidden="true"></span>
+              <svg class="login-submit-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </form>
+
+          <p class="login-footnote animate-in" style="--delay: 0.75s">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Only newly created workspaces can be accessed directly.
           </p>
         </div>
 
