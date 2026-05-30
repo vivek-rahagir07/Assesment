@@ -107,9 +107,31 @@ const btnExportCsv = document.getElementById('btn-export-csv');
 const btnExportExcel = document.getElementById('btn-export-excel');
 const analyticsDashboardPanel = document.getElementById('analytics-dashboard-panel');
 const dashboardStatsGrid = document.getElementById('dashboard-stats-grid');
+const candidateDetailModal = document.getElementById('candidate-detail-modal');
+const candidateDetailBody = document.getElementById('candidate-detail-body');
+const candidateDetailTitle = document.getElementById('candidate-detail-title');
+const candidateDetailSubtitle = document.getElementById('candidate-detail-subtitle');
+const btnCloseCandidateModal = document.getElementById('btn-close-candidate-modal');
+const candidateDetailBackdrop = document.getElementById('candidate-detail-backdrop');
+const btnCandidatePrint = document.getElementById('btn-candidate-print');
+const btnCandidatePdf = document.getElementById('btn-candidate-pdf');
+const btnCandidateEditToggle = document.getElementById('btn-candidate-edit-toggle');
+const btnCandidateSave = document.getElementById('btn-candidate-save');
+const scorecardPrintRoot = document.getElementById('scorecard-print-root');
+const draftResumeBanner = document.getElementById('draft-resume-banner');
+const draftResumeSummary = document.getElementById('draft-resume-summary');
+const draftResumeMeta = document.getElementById('draft-resume-meta');
+const btnResumeDraft = document.getElementById('btn-resume-draft');
+const btnDiscardDraft = document.getElementById('btn-discard-draft');
 
 let chartInstances = {};
 let dashboardVisible = false;
+let viewingCandidate = null;
+let candidateDetailEditMode = false;
+let cachedDraft = null;
+let draftSaveTimer = null;
+let settingsSaveTimer = null;
+let liveInterviewAutosaveBound = false;
 
 const showToast = (message, type = 'success') => {
   toastMsg.textContent = message;
@@ -355,6 +377,8 @@ const enterWorkspace = (wsName) => {
   analyticsDashboardPanel?.classList.add('hidden');
   Object.keys(chartInstances).forEach(destroyChart);
   legacyCleanupDone = false;
+  loadWorkspaceSettings();
+  loadInterviewDraft().then(() => renderDraftBanner());
   setupFirestoreSync();
   switchTab('dashboard');
 };
@@ -381,7 +405,10 @@ btnSwitchWs.addEventListener('click', () => {
 
   templates = [];
   candidates = [];
+  cachedDraft = null;
   legacyCleanupDone = false;
+  scoreThresholds = { high: 80, low: 50 };
+  applyScoreThresholdsToUI();
   dashboardVisible = false;
   analyticsDashboardPanel?.classList.add('hidden');
   Object.keys(chartInstances).forEach(destroyChart);
@@ -415,8 +442,11 @@ if (btnTogglePass && wsPassInput) {
 const padTime = (value) => value.toString().padStart(2, '0');
 const getFormattedTime = (seconds) => `${padTime(Math.floor(seconds / 60))}:${padTime(seconds % 60)}`;
 
-const evaluateOverallPerformanceScore = (scores, rubrics, likerts) => {
-  if (!rubrics || rubrics.length === 0) return 0;
+const computeScoreBreakdown = (scores, rubrics, likerts) => {
+  if (!rubrics || rubrics.length === 0) {
+    return { criteriaScore: 0, likertScore: 0, finalScore: 0, criteriaWeight: 0.6, likertWeight: 0.4, likertsAnswered: 0 };
+  }
+
   let totalWeightedScore = 0;
   let totalWeightUsed = 0;
 
@@ -433,10 +463,11 @@ const evaluateOverallPerformanceScore = (scores, rubrics, likerts) => {
     }
   });
 
-  const criteriaFinalScore = totalWeightUsed > 0 ? (totalWeightedScore / totalWeightUsed) * 100 : 0;
+  const criteriaScore = totalWeightUsed > 0 ? Math.round((totalWeightedScore / totalWeightUsed) * 1000) / 10 : 0;
   let totalLikertScore = 0;
   let likertsAnswered = 0;
-  Object.keys(likerts).forEach((key) => {
+
+  Object.keys(likerts || {}).forEach((key) => {
     const response = likerts[key];
     if (response) {
       likertsAnswered++;
@@ -446,11 +477,32 @@ const evaluateOverallPerformanceScore = (scores, rubrics, likerts) => {
     }
   });
 
-  if (likertsAnswered === 0) return Math.round(criteriaFinalScore * 10) / 10;
+  if (likertsAnswered === 0) {
+    return {
+      criteriaScore,
+      likertScore: 0,
+      finalScore: criteriaScore,
+      criteriaWeight: 1,
+      likertWeight: 0,
+      likertsAnswered: 0
+    };
+  }
 
-  const likertFinalScore = (totalLikertScore / (likertsAnswered * 10)) * 100;
-  const finalScore = (criteriaFinalScore * 0.6) + (likertFinalScore * 0.4);
-  return Math.round(finalScore * 10) / 10;
+  const likertScore = Math.round((totalLikertScore / (likertsAnswered * 10)) * 1000) / 10;
+  const finalScore = Math.round((criteriaScore * 0.6 + likertScore * 0.4) * 10) / 10;
+
+  return {
+    criteriaScore,
+    likertScore,
+    finalScore,
+    criteriaWeight: 0.6,
+    likertWeight: 0.4,
+    likertsAnswered
+  };
+};
+
+const evaluateOverallPerformanceScore = (scores, rubrics, likerts) => {
+  return computeScoreBreakdown(scores, rubrics, likerts).finalScore;
 };
 
 const getPerformerCategory = (score) => {
@@ -752,6 +804,607 @@ const toggleAnalyticsDashboard = (show) => {
   }
 };
 
+const getCandidateCriteria = (cand) => {
+  if (cand.templateCriteria?.length) return cand.templateCriteria;
+  const tpl = templates.find((t) => t.title === cand.templateTitle);
+  if (tpl?.criteria?.length) return tpl.criteria;
+  return Object.keys(cand.scores || {}).map((id) => ({
+    id,
+    name: id.replace(/^crit-/, '').replace(/-/g, ' '),
+    weight: 0,
+    desc: ''
+  }));
+};
+
+const getRateBadgeClass = (rate) => {
+  if (rate === 'VS') return 'detail-rate-vs';
+  if (rate === 'S') return 'detail-rate-s';
+  if (rate === 'NS') return 'detail-rate-ns';
+  return 'detail-rate-na';
+};
+
+const escapeHtml = (str) => String(str ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+
+const applyScoreThresholdsToUI = () => {
+  if (cutoffHighSlider) cutoffHighSlider.value = scoreThresholds.high;
+  if (cutoffLowSlider) cutoffLowSlider.value = scoreThresholds.low;
+  if (labelCutoffHigh) labelCutoffHigh.textContent = `${scoreThresholds.high}%`;
+  if (labelCutoffLow) labelCutoffLow.textContent = `${scoreThresholds.low}%`;
+};
+
+const loadWorkspaceSettings = async () => {
+  if (!currentWorkspace) return;
+  try {
+    const wsRef = doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace);
+    const snap = await getDoc(wsRef);
+    const settings = snap.data()?.settings;
+    if (settings?.scoreThresholds) {
+      scoreThresholds = {
+        high: Number(settings.scoreThresholds.high) || 80,
+        low: Number(settings.scoreThresholds.low) || 50
+      };
+      applyScoreThresholdsToUI();
+    }
+  } catch (err) {
+    console.error('Failed to load workspace settings:', err);
+  }
+};
+
+const scheduleSaveWorkspaceSettings = () => {
+  clearTimeout(settingsSaveTimer);
+  settingsSaveTimer = setTimeout(async () => {
+    if (!currentWorkspace || !user) return;
+    try {
+      const wsRef = doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace);
+      await setDoc(wsRef, {
+        settings: {
+          scoreThresholds: { ...scoreThresholds },
+          updatedAt: new Date().toISOString()
+        }
+      }, { merge: true });
+    } catch (err) {
+      console.error('Failed to save workspace settings:', err);
+    }
+  }, 600);
+};
+
+const getDraftStorageKey = () => {
+  if (!currentWorkspace || !user) return null;
+  return `tc_draft_${app_id}_${currentWorkspace}_${user.uid}`;
+};
+
+const collectLiveInterviewState = () => {
+  if (!activeInterviewTemplate) return null;
+  return {
+    templateSnapshot: {
+      id: activeInterviewTemplate.id,
+      title: activeInterviewTemplate.title,
+      role: activeInterviewTemplate.role || '',
+      description: activeInterviewTemplate.description || '',
+      criteria: activeInterviewTemplate.criteria?.map((c) => ({ ...c })) || []
+    },
+    candidateName: document.getElementById('candidate-name')?.value || '',
+    candidateRole: document.getElementById('candidate-role')?.value || '',
+    interviewerName: document.getElementById('interviewer-name')?.value || '',
+    dateOfInterview: document.getElementById('date-of-interview')?.value || '',
+    candidateScores: { ...candidateScores },
+    candidateNotes: { ...candidateNotes },
+    likertResponses: { ...likertResponses },
+    strengths: document.getElementById('candidate-strengths')?.value || '',
+    weaknesses: document.getElementById('candidate-weaknesses')?.value || '',
+    overallFeedback: document.getElementById('overall-feedback')?.value || '',
+    scratchpad: document.getElementById('local-scratchpad')?.value || '',
+    durationSeconds: interviewDuration,
+    savedAt: new Date().toISOString(),
+    userId: user?.uid
+  };
+};
+
+const saveInterviewDraft = async () => {
+  const draft = collectLiveInterviewState();
+  if (!draft || !currentWorkspace || !user) return;
+
+  const hasContent = draft.candidateName.trim()
+    || Object.keys(draft.candidateScores).length > 0
+    || Object.keys(draft.likertResponses).length > 0
+    || draft.strengths || draft.weaknesses || draft.overallFeedback;
+
+  if (!hasContent) return;
+
+  cachedDraft = draft;
+  const storageKey = getDraftStorageKey();
+  if (storageKey) {
+    try { localStorage.setItem(storageKey, JSON.stringify(draft)); } catch (_) { /* ignore */ }
+  }
+
+  try {
+    const draftRef = doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'drafts', user.uid);
+    await setDoc(draftRef, draft);
+  } catch (err) {
+    console.error('Draft Firestore save failed:', err);
+  }
+
+  renderDraftBanner();
+};
+
+const scheduleDraftSave = () => {
+  if (!activeInterviewTemplate) return;
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(saveInterviewDraft, 1500);
+};
+
+const loadInterviewDraft = async () => {
+  if (!currentWorkspace || !user) {
+    cachedDraft = null;
+    return null;
+  }
+
+  try {
+    const draftRef = doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'drafts', user.uid);
+    const snap = await getDoc(draftRef);
+    if (snap.exists()) {
+      cachedDraft = snap.data();
+      return cachedDraft;
+    }
+  } catch (err) {
+    console.error('Draft Firestore load failed:', err);
+  }
+
+  const storageKey = getDraftStorageKey();
+  if (storageKey) {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        cachedDraft = JSON.parse(raw);
+        return cachedDraft;
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  cachedDraft = null;
+  return null;
+};
+
+const clearInterviewDraft = async () => {
+  cachedDraft = null;
+  const storageKey = getDraftStorageKey();
+  if (storageKey) {
+    try { localStorage.removeItem(storageKey); } catch (_) { /* ignore */ }
+  }
+  if (currentWorkspace && user) {
+    try {
+      await deleteDoc(doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'drafts', user.uid));
+    } catch (_) { /* ignore */ }
+  }
+  renderDraftBanner();
+};
+
+const renderDraftBanner = () => {
+  if (!draftResumeBanner) return;
+  if (!cachedDraft?.templateSnapshot) {
+    draftResumeBanner.classList.add('hidden');
+    return;
+  }
+
+  const name = cachedDraft.candidateName?.trim() || 'Unnamed candidate';
+  const tpl = cachedDraft.templateSnapshot.title || 'Interview';
+  const saved = cachedDraft.savedAt ? new Date(cachedDraft.savedAt).toLocaleString() : '';
+
+  draftResumeSummary.textContent = `${name} — ${tpl}`;
+  draftResumeMeta.textContent = saved ? `Last saved ${saved}` : 'Auto-saved draft available';
+  draftResumeBanner.classList.remove('hidden');
+};
+
+const bindLiveInterviewAutosave = () => {
+  if (liveInterviewAutosaveBound || !tabLiveInterviewContent) return;
+  liveInterviewAutosaveBound = true;
+
+  tabLiveInterviewContent.addEventListener('input', scheduleDraftSave);
+  tabLiveInterviewContent.addEventListener('change', scheduleDraftSave);
+  tabLiveInterviewContent.addEventListener('click', (event) => {
+    if (event.target.closest('.btn-score-select, .btn-likert-choice')) scheduleDraftSave();
+  });
+};
+
+const restoreInterviewFromDraft = (draft) => {
+  activeInterviewTemplate = {
+    id: draft.templateSnapshot.id,
+    title: draft.templateSnapshot.title,
+    role: draft.templateSnapshot.role,
+    description: draft.templateSnapshot.description,
+    criteria: draft.templateSnapshot.criteria || []
+  };
+
+  document.getElementById('candidate-name').value = draft.candidateName || '';
+  document.getElementById('candidate-role').value = draft.candidateRole || activeInterviewTemplate.role || '';
+  document.getElementById('interviewer-name').value = draft.interviewerName || '';
+  document.getElementById('date-of-interview').value = draft.dateOfInterview || new Date().toISOString().split('T')[0];
+  document.getElementById('candidate-strengths').value = draft.strengths || '';
+  document.getElementById('candidate-weaknesses').value = draft.weaknesses || '';
+  document.getElementById('overall-feedback').value = draft.overallFeedback || '';
+  document.getElementById('local-scratchpad').value = draft.scratchpad || '';
+
+  candidateScores = { ...(draft.candidateScores || {}) };
+  candidateNotes = { ...(draft.candidateNotes || {}) };
+  likertResponses = { ...(draft.likertResponses || {}) };
+  interviewDuration = draft.durationSeconds || 0;
+
+  clearInterval(timerInterval);
+  updateLiveTimerDisplay(interviewDuration);
+  timerInterval = setInterval(() => {
+    interviewDuration++;
+    updateLiveTimerDisplay(interviewDuration);
+    if (interviewDuration % 30 === 0) scheduleDraftSave();
+  }, 1000);
+
+  navActiveCandidateName.textContent = draft.candidateName?.trim() || 'Draft interview';
+  navActiveAssessmentContainer.classList.remove('hidden');
+  renderLiveInterviewSheet();
+  bindLiveInterviewAutosave();
+  switchTab('live-interview');
+};
+
+const resumeInterviewDraft = async () => {
+  const draft = cachedDraft || await loadInterviewDraft();
+  if (!draft?.templateSnapshot) {
+    showToast('No draft found to resume.', 'error');
+    return;
+  }
+  if (activeInterviewTemplate && !window.confirm('Replace your current interview with the saved draft?')) return;
+  restoreInterviewFromDraft(draft);
+  showToast('Draft restored — continue where you left off.', 'info');
+};
+
+const discardInterviewDraft = async () => {
+  if (!window.confirm('Discard this saved draft permanently?')) return;
+  await clearInterviewDraft();
+  showToast('Draft discarded.');
+};
+
+const buildScorecardHtml = (cand, criteria) => {
+  const category = getPerformerCategory(cand.calculatedScore);
+  const breakdown = computeScoreBreakdown(cand.scores || {}, criteria, cand.likertAnswers || {});
+
+  let criteriaHtml = criteria.map((crit) => {
+    const rate = (cand.scores || {})[crit.id] || '—';
+    const note = (cand.notes || {})[crit.id] || '';
+    return `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${escapeHtml(crit.name)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:bold;">${escapeHtml(rate)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#64748b;">${escapeHtml(note || '—')}</td>
+      </tr>`;
+  }).join('');
+
+  let likertHtml = MANDATORY_LIKERT_QUESTIONS.map((q, idx) => {
+    const ans = (cand.likertAnswers || {})[q.id] || '—';
+    return `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;">${idx + 1}. ${escapeHtml(q.text)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e2e8f0;font-weight:600;">${escapeHtml(ans)}</td>
+      </tr>`;
+  }).join('');
+
+  const breakdownNote = breakdown.likertsAnswered === 0
+    ? 'Final score based on criteria only (no checklist responses).'
+    : `Weighted: Criteria ${Math.round(breakdown.criteriaWeight * 100)}% (${breakdown.criteriaScore}%) + Checklist ${Math.round(breakdown.likertWeight * 100)}% (${breakdown.likertScore}%)`;
+
+  return `
+    <div style="font-family:system-ui,sans-serif;color:#0f172a;padding:32px;max-width:800px;">
+      <div style="display:flex;align-items:center;gap:16px;border-bottom:2px solid #4f46e5;padding-bottom:16px;margin-bottom:24px;">
+        <img src="photoes/logo.png" alt="Logo" style="height:48px;width:auto;" onerror="this.style.display='none'" />
+        <div>
+          <h1 style="margin:0;font-size:22px;font-weight:800;">TalentCalibrate</h1>
+          <p style="margin:4px 0 0;font-size:12px;color:#64748b;">Interview Evaluation Scorecard</p>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+        <div><strong style="font-size:11px;color:#64748b;text-transform:uppercase;">Candidate</strong><p style="margin:4px 0 0;font-size:16px;font-weight:700;">${escapeHtml(cand.name)}</p></div>
+        <div><strong style="font-size:11px;color:#64748b;text-transform:uppercase;">Position</strong><p style="margin:4px 0 0;">${escapeHtml(cand.role || '—')}</p></div>
+        <div><strong style="font-size:11px;color:#64748b;text-transform:uppercase;">Interviewer</strong><p style="margin:4px 0 0;">${escapeHtml(cand.interviewer || '—')}</p></div>
+        <div><strong style="font-size:11px;color:#64748b;text-transform:uppercase;">Interview Date</strong><p style="margin:4px 0 0;">${escapeHtml(cand.date || '—')}</p></div>
+        <div><strong style="font-size:11px;color:#64748b;text-transform:uppercase;">Template</strong><p style="margin:4px 0 0;">${escapeHtml(cand.templateTitle || '—')}</p></div>
+        <div><strong style="font-size:11px;color:#64748b;text-transform:uppercase;">Duration</strong><p style="margin:4px 0 0;">${escapeHtml(formatDuration(cand.durationSeconds))}</p></div>
+      </div>
+
+      <div style="display:flex;gap:16px;margin-bottom:24px;">
+        <div style="flex:1;background:#eef2ff;border-radius:12px;padding:16px;text-align:center;">
+          <p style="margin:0;font-size:11px;color:#4338ca;font-weight:700;text-transform:uppercase;">Final Score</p>
+          <p style="margin:4px 0 0;font-size:28px;font-weight:900;">${cand.calculatedScore}%</p>
+        </div>
+        <div style="flex:1;background:#f0fdf4;border-radius:12px;padding:16px;text-align:center;">
+          <p style="margin:0;font-size:11px;color:#166534;font-weight:700;text-transform:uppercase;">Category</p>
+          <p style="margin:4px 0 0;font-size:16px;font-weight:800;">${escapeHtml(category.label)}</p>
+        </div>
+      </div>
+
+      <p style="font-size:11px;color:#64748b;margin-bottom:24px;">${breakdownNote}</p>
+
+      <h2 style="font-size:13px;font-weight:800;text-transform:uppercase;color:#64748b;margin:0 0 8px;">Rating Criteria</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px;">
+        <thead><tr style="background:#f8fafc;">
+          <th style="padding:8px;text-align:left;">Criterion</th>
+          <th style="padding:8px;text-align:center;">Rating</th>
+          <th style="padding:8px;text-align:left;">Notes</th>
+        </tr></thead>
+        <tbody>${criteriaHtml}</tbody>
+      </table>
+
+      <h2 style="font-size:13px;font-weight:800;text-transform:uppercase;color:#64748b;margin:0 0 8px;">Feedback Checklist</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px;">
+        <tbody>${likertHtml}</tbody>
+      </table>
+
+      <h2 style="font-size:13px;font-weight:800;text-transform:uppercase;color:#64748b;margin:0 0 8px;">Qualitative Summary</h2>
+      <div style="margin-bottom:12px;"><strong style="font-size:11px;">Strengths</strong><p style="margin:4px 0 0;font-size:12px;white-space:pre-wrap;">${escapeHtml(cand.strengths || '—')}</p></div>
+      <div style="margin-bottom:12px;"><strong style="font-size:11px;">Weaknesses</strong><p style="margin:4px 0 0;font-size:12px;white-space:pre-wrap;">${escapeHtml(cand.weaknesses || '—')}</p></div>
+      <div style="margin-bottom:24px;"><strong style="font-size:11px;">Overall Verdict</strong><p style="margin:4px 0 0;font-size:12px;white-space:pre-wrap;">${escapeHtml(cand.overallFeedback || '—')}</p></div>
+
+      <div style="border-top:1px solid #e2e8f0;padding-top:24px;margin-top:32px;display:grid;grid-template-columns:1fr 1fr;gap:32px;">
+        <div>
+          <p style="margin:0 0 32px;font-size:11px;color:#64748b;">Interviewer Signature</p>
+          <div style="border-bottom:1px solid #94a3b8;"></div>
+          <p style="margin:8px 0 0;font-size:11px;">${escapeHtml(cand.interviewer || '')}</p>
+        </div>
+        <div>
+          <p style="margin:0 0 32px;font-size:11px;color:#64748b;">Date</p>
+          <div style="border-bottom:1px solid #94a3b8;"></div>
+          <p style="margin:8px 0 0;font-size:11px;">${escapeHtml(cand.date || new Date(cand.evaluatedAt).toLocaleDateString())}</p>
+        </div>
+      </div>
+    </div>`;
+};
+
+const printCandidateScorecard = (cand) => {
+  const criteria = getCandidateCriteria(cand);
+  if (!scorecardPrintRoot) return;
+  scorecardPrintRoot.innerHTML = buildScorecardHtml(cand, criteria);
+  window.print();
+};
+
+const downloadCandidatePdf = async (cand) => {
+  const criteria = getCandidateCriteria(cand);
+  if (!scorecardPrintRoot) return;
+
+  if (typeof html2pdf === 'undefined') {
+    printCandidateScorecard(cand);
+    showToast('PDF library unavailable — opened print dialog instead.', 'info');
+    return;
+  }
+
+  scorecardPrintRoot.innerHTML = buildScorecardHtml(cand, criteria);
+  const slug = (cand.name || 'candidate').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  try {
+    await html2pdf().set({
+      margin: 10,
+      filename: `Scorecard_${slug}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(scorecardPrintRoot).save();
+    showToast('PDF downloaded successfully.');
+  } catch (err) {
+    console.error(err);
+    printCandidateScorecard(cand);
+    showToast('PDF export failed — opened print dialog instead.', 'error');
+  }
+};
+
+const renderCandidateDetailContent = () => {
+  if (!viewingCandidate || !candidateDetailBody) return;
+
+  const cand = viewingCandidate;
+  const criteria = getCandidateCriteria(cand);
+  const category = getPerformerCategory(cand.calculatedScore);
+  const breakdown = computeScoreBreakdown(cand.scores || {}, criteria, cand.likertAnswers || {});
+
+  candidateDetailTitle.textContent = cand.name || 'Candidate';
+  candidateDetailSubtitle.textContent = `${cand.role || 'No role'} · ${cand.interviewer || '—'} · ${cand.date || 'No date'}`;
+
+  const breakdownHtml = breakdown.likertsAnswered === 0
+    ? `<p class="text-[10px] text-slate-500 mt-2">Score based on criteria ratings only.</p>`
+    : `<p class="text-[10px] text-slate-500 mt-2">(${breakdown.criteriaScore}% × 60%) + (${breakdown.likertScore}% × 40%)</p>`;
+
+  const criteriaRows = criteria.map((crit) => {
+    const rate = (cand.scores || {})[crit.id] || '';
+    const note = (cand.notes || {})[crit.id] || '';
+    if (candidateDetailEditMode) {
+      return `
+        <div class="detail-criteria-row">
+          <span class="text-xs font-bold text-slate-800">${escapeHtml(crit.name)}</span>
+          <div class="flex flex-wrap gap-1 mt-1">
+            ${['NS', 'S', 'VS', 'NA'].map((r) => `
+              <button type="button" data-crit-id="${crit.id}" data-rate="${r}"
+                class="detail-edit-rate px-2 py-1 text-[10px] font-bold rounded-full border ${rate === r ? getRateBadgeClass(r) : 'bg-white border-slate-200'}">${r}</button>
+            `).join('')}
+          </div>
+          <input type="text" class="detail-edit-input mt-1 detail-edit-note" data-crit-id="${crit.id}" value="${escapeHtml(note)}" placeholder="Notes for this criterion" />
+        </div>`;
+    }
+    return `
+      <div class="detail-criteria-row">
+        <div class="flex items-start justify-between gap-2">
+          <span class="text-xs font-bold text-slate-800">${escapeHtml(crit.name)}</span>
+          <span class="detail-rate-badge ${getRateBadgeClass(rate || 'NA')}">${escapeHtml(rate || '—')}</span>
+        </div>
+        ${note ? `<p class="text-[10px] text-slate-500 mt-1">${escapeHtml(note)}</p>` : ''}
+      </div>`;
+  }).join('');
+
+  const likertRows = MANDATORY_LIKERT_QUESTIONS.map((q, idx) => {
+    const ans = (cand.likertAnswers || {})[q.id] || '';
+    if (candidateDetailEditMode) {
+      return `
+        <div class="detail-likert-row">
+          <span class="text-xs text-slate-800">${idx + 1}. ${escapeHtml(q.text)}</span>
+          <select class="detail-edit-select detail-edit-likert mt-1" data-likert-id="${q.id}">
+            <option value="">—</option>
+            ${['Strongly Agree', 'Agree', 'Disagree', 'Could not determine'].map((c) => `
+              <option value="${c}" ${ans === c ? 'selected' : ''}>${c}</option>
+            `).join('')}
+          </select>
+        </div>`;
+    }
+    return `
+      <div class="detail-likert-row">
+        <span class="text-xs text-slate-700">${idx + 1}. ${escapeHtml(q.text)}</span>
+        <span class="text-xs font-semibold text-indigo-700 mt-0.5">${escapeHtml(ans || '—')}</span>
+      </div>`;
+  }).join('');
+
+  const metaFields = candidateDetailEditMode ? `
+    <div class="grid gap-3 sm:grid-cols-2 mb-4">
+      <div><label class="text-[10px] font-bold text-slate-500 uppercase">Interviewer</label>
+        <input type="text" id="detail-edit-interviewer" class="detail-edit-input mt-1" value="${escapeHtml(cand.interviewer || '')}" /></div>
+      <div><label class="text-[10px] font-bold text-slate-500 uppercase">Interview Date</label>
+        <input type="date" id="detail-edit-date" class="detail-edit-input mt-1" value="${escapeHtml(cand.date || '')}" /></div>
+    </div>` : '';
+
+  const qualFields = candidateDetailEditMode ? `
+    <textarea id="detail-edit-strengths" class="detail-edit-textarea mb-2" placeholder="Strengths">${escapeHtml(cand.strengths || '')}</textarea>
+    <textarea id="detail-edit-weaknesses" class="detail-edit-textarea mb-2" placeholder="Weaknesses">${escapeHtml(cand.weaknesses || '')}</textarea>
+    <textarea id="detail-edit-feedback" class="detail-edit-textarea" placeholder="Overall verdict">${escapeHtml(cand.overallFeedback || '')}</textarea>
+  ` : `
+    <p class="text-xs text-slate-700"><strong>Strengths:</strong> ${escapeHtml(cand.strengths || '—')}</p>
+    <p class="text-xs text-slate-700 mt-2"><strong>Weaknesses:</strong> ${escapeHtml(cand.weaknesses || '—')}</p>
+    <p class="text-xs text-slate-700 mt-2"><strong>Verdict:</strong> ${escapeHtml(cand.overallFeedback || '—')}</p>
+  `;
+
+  candidateDetailBody.innerHTML = `
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <span class="inline-block px-3 py-1 rounded-full border text-xs font-bold ${category.color}">${category.label}</span>
+      <span class="text-lg font-black text-slate-900">${cand.calculatedScore}%</span>
+      <span class="text-[10px] text-slate-400">${escapeHtml(cand.templateTitle || '')}</span>
+    </div>
+
+    <div class="detail-section">
+      <p class="detail-section-title">Score Breakdown</p>
+      <div class="detail-score-breakdown">
+        <div class="detail-score-card bg-indigo-50 border-indigo-200">
+          <p class="text-[10px] font-bold text-indigo-600 uppercase">Criteria</p>
+          <p class="text-xl font-black text-indigo-900">${breakdown.criteriaScore}%</p>
+          <p class="text-[10px] text-indigo-500">${breakdown.likertsAnswered ? '60% weight' : '100% weight'}</p>
+        </div>
+        <div class="detail-score-card bg-violet-50 border-violet-200">
+          <p class="text-[10px] font-bold text-violet-600 uppercase">Checklist</p>
+          <p class="text-xl font-black text-violet-900">${breakdown.likertsAnswered ? `${breakdown.likertScore}%` : '—'}</p>
+          <p class="text-[10px] text-violet-500">${breakdown.likertsAnswered ? '40% weight' : 'Not answered'}</p>
+        </div>
+        <div class="detail-score-card bg-emerald-50 border-emerald-200">
+          <p class="text-[10px] font-bold text-emerald-600 uppercase">Final</p>
+          <p class="text-xl font-black text-emerald-900">${breakdown.finalScore}%</p>
+        </div>
+      </div>
+      ${breakdownHtml}
+    </div>
+
+    ${metaFields}
+
+    <div class="detail-section">
+      <p class="detail-section-title">Rating Criteria</p>
+      ${criteriaRows}
+    </div>
+
+    <div class="detail-section">
+      <p class="detail-section-title">Feedback Checklist</p>
+      ${likertRows}
+    </div>
+
+    <div class="detail-section">
+      <p class="detail-section-title">Qualitative Summary</p>
+      ${qualFields}
+    </div>
+  `;
+
+  if (candidateDetailEditMode) {
+    candidateDetailBody.querySelectorAll('.detail-edit-rate').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const critId = btn.dataset.critId;
+        const rate = btn.dataset.rate;
+        if (!viewingCandidate.scores) viewingCandidate.scores = {};
+        viewingCandidate.scores[critId] = rate;
+        renderCandidateDetailContent();
+      });
+    });
+  }
+
+  btnCandidateEditToggle.textContent = candidateDetailEditMode ? 'Cancel Edit' : 'Edit Record';
+  btnCandidateSave.classList.toggle('hidden', !candidateDetailEditMode);
+};
+
+const openCandidateDetail = (cand) => {
+  viewingCandidate = { ...cand, scores: { ...(cand.scores || {}) }, notes: { ...(cand.notes || {}) }, likertAnswers: { ...(cand.likertAnswers || {}) } };
+  candidateDetailEditMode = false;
+  renderCandidateDetailContent();
+  candidateDetailModal?.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+};
+
+const closeCandidateDetail = () => {
+  candidateDetailModal?.classList.add('hidden');
+  document.body.style.overflow = '';
+  viewingCandidate = null;
+  candidateDetailEditMode = false;
+};
+
+const saveCandidateDetailEdits = async () => {
+  if (!viewingCandidate?.id || !currentWorkspace) return;
+
+  if (candidateDetailEditMode) {
+    viewingCandidate.interviewer = document.getElementById('detail-edit-interviewer')?.value.trim() || '—';
+    viewingCandidate.date = document.getElementById('detail-edit-date')?.value || '';
+    viewingCandidate.strengths = document.getElementById('detail-edit-strengths')?.value || '';
+    viewingCandidate.weaknesses = document.getElementById('detail-edit-weaknesses')?.value || '';
+    viewingCandidate.overallFeedback = document.getElementById('detail-edit-feedback')?.value || '';
+
+    candidateDetailBody.querySelectorAll('.detail-edit-note').forEach((input) => {
+      if (!viewingCandidate.notes) viewingCandidate.notes = {};
+      viewingCandidate.notes[input.dataset.critId] = input.value;
+    });
+
+    candidateDetailBody.querySelectorAll('.detail-edit-likert').forEach((select) => {
+      if (!viewingCandidate.likertAnswers) viewingCandidate.likertAnswers = {};
+      viewingCandidate.likertAnswers[select.dataset.likertId] = select.value;
+    });
+  }
+
+  const criteria = getCandidateCriteria(viewingCandidate);
+  viewingCandidate.calculatedScore = computeScoreBreakdown(
+    viewingCandidate.scores,
+    criteria,
+    viewingCandidate.likertAnswers
+  ).finalScore;
+
+  try {
+    const docRef = doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates', viewingCandidate.id);
+    await updateDoc(docRef, {
+      interviewer: viewingCandidate.interviewer,
+      date: viewingCandidate.date,
+      scores: viewingCandidate.scores,
+      notes: viewingCandidate.notes,
+      likertAnswers: viewingCandidate.likertAnswers,
+      strengths: viewingCandidate.strengths,
+      weaknesses: viewingCandidate.weaknesses,
+      overallFeedback: viewingCandidate.overallFeedback,
+      calculatedScore: viewingCandidate.calculatedScore,
+      updatedAt: new Date().toISOString()
+    });
+    showToast('Evaluation updated successfully.');
+    candidateDetailEditMode = false;
+    renderCandidateDetailContent();
+    renderAnalytics();
+  } catch (err) {
+    console.error(err);
+    showToast('Could not save changes.', 'error');
+  }
+};
+
 const renderTemplates = () => {
   if (!templatesGrid) return;
   templatesGrid.innerHTML = '';
@@ -774,6 +1427,7 @@ const renderTemplates = () => {
       resetFormBuilderDefaults();
       switchTab('form-builder');
     });
+    renderDraftBanner();
     return;
   }
 
@@ -821,6 +1475,8 @@ const renderTemplates = () => {
 
     templatesGrid.appendChild(card);
   });
+
+  renderDraftBanner();
 };
 
 const renderBuilderCriteria = () => {
@@ -1021,11 +1677,17 @@ const renderAnalytics = () => {
       <td class="p-4 max-w-[150px] truncate" title="${cand.strengths || '-'}">${cand.strengths || '-'}</td>
       <td class="p-4 max-w-[150px] truncate" title="${cand.weaknesses || '-'}">${cand.weaknesses || '-'}</td>
       <td class="p-4 text-right space-x-1 whitespace-nowrap">
+        <button class="btn-view-cand p-2 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100" title="View full evaluation">👁</button>
+        <button class="btn-print-cand p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100" title="Print scorecard">🖨</button>
+        <button class="btn-pdf-cand p-2 bg-violet-50 text-violet-600 rounded-full hover:bg-violet-100" title="Download PDF scorecard">📄</button>
         <button class="btn-copy-report p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100" title="Copy scorecard report to clipboard">📋</button>
         <button class="btn-delete-cand p-2 bg-rose-50 text-rose-600 rounded-full hover:bg-rose-100" title="Remove Evaluation permanently">🗑</button>
       </td>
     `;
 
+    row.querySelector('.btn-view-cand').addEventListener('click', () => openCandidateDetail(cand));
+    row.querySelector('.btn-print-cand').addEventListener('click', () => printCandidateScorecard(cand));
+    row.querySelector('.btn-pdf-cand').addEventListener('click', () => downloadCandidatePdf(cand));
     row.querySelector('.btn-copy-report').addEventListener('click', () => {
       const text = `Candidate Report: ${cand.name}\nOverall Grade: ${cand.calculatedScore}%\nVerdict: ${category.label}\nStrengths: ${cand.strengths}\nWeaknesses: ${cand.weaknesses}\nAdditional Comments: ${cand.overallFeedback}`;
       navigator.clipboard?.writeText ? navigator.clipboard.writeText(text) : document.execCommand('copy');
@@ -1135,6 +1797,8 @@ templateEditorForm.addEventListener('submit', async (event) => {
 });
 
 const handleStartInterview = (template) => {
+  if (cachedDraft?.templateSnapshot && !window.confirm('Starting a new interview will replace your saved draft on next auto-save. Continue?')) return;
+
   activeInterviewTemplate = template;
   document.getElementById('candidate-name').value = '';
   document.getElementById('candidate-role').value = template.role || '';
@@ -1164,6 +1828,7 @@ const handleStartInterview = (template) => {
   navActiveCandidateName.textContent = 'New interview';
   navActiveAssessmentContainer.classList.remove('hidden');
   renderLiveInterviewSheet();
+  bindLiveInterviewAutosave();
   switchTab('live-interview');
 };
 
@@ -1176,13 +1841,16 @@ document.getElementById('candidate-name').addEventListener('input', (event) => {
   navActiveCandidateName.textContent = event.target.value.trim() || 'New interview';
 });
 
-document.getElementById('btn-cancel-interview').addEventListener('click', () => {
-  if (window.confirm('Discard this interview? Unsaved ratings will be lost.')) cleanupActiveInterview();
+document.getElementById('btn-cancel-interview').addEventListener('click', async () => {
+  if (!window.confirm('Leave this interview? Your progress is auto-saved as a draft you can resume later.')) return;
+  await saveInterviewDraft();
+  cleanupActiveInterview();
 });
 
 const cleanupActiveInterview = (silent = false) => {
   clearInterval(timerInterval);
   timerInterval = null;
+  clearTimeout(draftSaveTimer);
   activeInterviewTemplate = null;
   candidateScores = {};
   candidateNotes = {};
@@ -1222,6 +1890,7 @@ document.getElementById('live-interview-form').addEventListener('submit', async 
     interviewer: document.getElementById('interviewer-name').value.trim() || '—',
     date: document.getElementById('date-of-interview').value,
     templateTitle: activeInterviewTemplate.title,
+    templateCriteria: activeInterviewTemplate.criteria?.map((c) => ({ ...c })) || [],
     scores: candidateScores,
     notes: candidateNotes,
     likertAnswers: likertResponses,
@@ -1236,6 +1905,7 @@ document.getElementById('live-interview-form').addEventListener('submit', async 
   try {
     const candidatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
     await addDoc(candidatesCollection, candidateData);
+    await clearInterviewDraft();
     showToast(`${candidateData.name} saved — score ${calculatedScore}%`);
     cleanupActiveInterview();
     switchTab('class-analytics');
@@ -1261,12 +1931,14 @@ cutoffHighSlider.addEventListener('input', (event) => {
   scoreThresholds.high = Number(event.target.value);
   labelCutoffHigh.textContent = `${scoreThresholds.high}%`;
   renderAnalytics();
+  scheduleSaveWorkspaceSettings();
 });
 
 cutoffLowSlider.addEventListener('input', (event) => {
   scoreThresholds.low = Number(event.target.value);
   labelCutoffLow.textContent = `${scoreThresholds.low}%`;
   renderAnalytics();
+  scheduleSaveWorkspaceSettings();
 });
 
 analyticsSearch.addEventListener('input', (event) => {
@@ -1283,6 +1955,34 @@ btnToggleDashboard?.addEventListener('click', () => toggleAnalyticsDashboard(!da
 btnCloseDashboard?.addEventListener('click', () => toggleAnalyticsDashboard(false));
 btnExportCsv?.addEventListener('click', exportCandidatesCSV);
 btnExportExcel?.addEventListener('click', exportCandidatesExcel);
+
+btnCloseCandidateModal?.addEventListener('click', closeCandidateDetail);
+candidateDetailBackdrop?.addEventListener('click', closeCandidateDetail);
+btnCandidatePrint?.addEventListener('click', () => viewingCandidate && printCandidateScorecard(viewingCandidate));
+btnCandidatePdf?.addEventListener('click', () => viewingCandidate && downloadCandidatePdf(viewingCandidate));
+btnCandidateEditToggle?.addEventListener('click', () => {
+  candidateDetailEditMode = !candidateDetailEditMode;
+  renderCandidateDetailContent();
+});
+btnCandidateSave?.addEventListener('click', saveCandidateDetailEdits);
+btnResumeDraft?.addEventListener('click', resumeInterviewDraft);
+btnDiscardDraft?.addEventListener('click', discardInterviewDraft);
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && candidateDetailModal && !candidateDetailModal.classList.contains('hidden')) {
+    closeCandidateDetail();
+  }
+});
+
+window.addEventListener('beforeunload', () => {
+  if (!activeInterviewTemplate) return;
+  const draft = collectLiveInterviewState();
+  if (!draft) return;
+  const storageKey = getDraftStorageKey();
+  if (storageKey) {
+    try { localStorage.setItem(storageKey, JSON.stringify(draft)); } catch (_) { /* ignore */ }
+  }
+});
 
 const createStandardTemplate = async () => {
   if (!user || !currentWorkspace) {

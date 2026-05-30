@@ -1,4 +1,4 @@
-const CACHE_NAME = 'talentcalibrate-v3';
+const CACHE_NAME = 'talentcalibrate-v4';
 const ASSETS = [
   './',
   './index.html',

@@ -11,6 +11,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="relative min-h-screen text-slate-900">
@@ -202,6 +203,20 @@
               <div class="rounded-3xl bg-gradient-to-r from-indigo-700 to-indigo-900 p-6 text-white shadow-xl">
                 <h2 class="text-2xl font-bold tracking-tight">Your evaluation rubrics</h2>
                 <p class="mt-2 text-sm text-indigo-100 max-w-3xl">Build structured scorecards with 6 core criteria, Likert checklists, and calibrated scoring — then run live interviews from any template.</p>
+              </div>
+
+              <div id="draft-resume-banner" class="hidden rounded-3xl border border-amber-300 bg-amber-50/90 p-4 shadow-sm">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-amber-700">Draft in progress</p>
+                    <p id="draft-resume-summary" class="mt-1 text-sm text-amber-900"></p>
+                    <p id="draft-resume-meta" class="text-[10px] text-amber-600 mt-0.5"></p>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <button type="button" id="btn-resume-draft" class="rounded-full bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700">Resume Interview</button>
+                    <button type="button" id="btn-discard-draft" class="rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100">Discard Draft</button>
+                  </div>
+                </div>
               </div>
 
               <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -481,6 +496,31 @@
   <footer id="login-footer" class="login-footer relative z-10 py-6 text-center text-xs text-slate-400">
     <p>TalentCalibrate · Interview evaluation platform</p>
   </footer>
+
+  <!-- Candidate detail modal -->
+  <div id="candidate-detail-modal" class="candidate-modal hidden" role="dialog" aria-modal="true" aria-labelledby="candidate-detail-title">
+    <div id="candidate-detail-backdrop" class="candidate-modal-backdrop"></div>
+    <div class="candidate-modal-panel">
+      <div class="candidate-modal-header">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-[0.25em] text-indigo-500">Evaluation Record</p>
+          <h2 id="candidate-detail-title" class="text-xl font-bold text-slate-900 mt-1">Candidate</h2>
+          <p id="candidate-detail-subtitle" class="text-xs text-slate-500 mt-0.5"></p>
+        </div>
+        <button type="button" id="btn-close-candidate-modal" class="candidate-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div id="candidate-detail-body" class="candidate-modal-body"></div>
+      <div class="candidate-modal-footer">
+        <button type="button" id="btn-candidate-print" class="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Print Report</button>
+        <button type="button" id="btn-candidate-pdf" class="rounded-full border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100">Download PDF</button>
+        <button type="button" id="btn-candidate-edit-toggle" class="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Edit Record</button>
+        <button type="button" id="btn-candidate-save" class="hidden rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden print root for scorecards -->
+  <div id="scorecard-print-root" class="scorecard-print-root" aria-hidden="true"></div>
 
   <script src="app.js" type="module" defer></script>
 </body>
