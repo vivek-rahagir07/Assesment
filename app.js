@@ -208,6 +208,13 @@ const NAV_IDLE = 'w-full flex items-center gap-3 rounded-3xl px-4 py-3 text-sm f
 const NAV_ACTIVE = 'w-full flex items-center gap-3 rounded-3xl bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 transition';
 const NAV_LIVE_ACTIVE = 'mt-3 w-full rounded-3xl bg-white px-4 py-3 text-left text-sm font-semibold text-rose-700 transition hover:bg-rose-100';
 
+const evaluatorNotepadAside = document.getElementById('evaluator-notepad-aside');
+
+const setLiveInterviewLayout = (active) => {
+  loginShell?.classList.toggle('live-interview-focus', active);
+  evaluatorNotepadAside?.classList.toggle('hidden', !active);
+};
+
 const switchTab = (tabName) => {
   [navDashboard, navFormBuilder, navClassAnalytics].forEach(el => {
     if (el) el.className = NAV_IDLE;
@@ -218,20 +225,26 @@ const switchTab = (tabName) => {
   [tabDashboardContent, tabFormBuilderContent, tabLiveInterviewContent, tabClassAnalyticsContent].forEach(el => el?.classList.add('hidden'));
 
   if (tabName === 'dashboard') {
+    setLiveInterviewLayout(false);
     navDashboard.className = NAV_ACTIVE;
     tabDashboardContent.classList.remove('hidden');
     renderTemplates();
   } else if (tabName === 'form-builder') {
+    setLiveInterviewLayout(false);
     navFormBuilder.className = NAV_ACTIVE;
     tabFormBuilderContent.classList.remove('hidden');
     renderBuilderCriteria();
   } else if (tabName === 'live-interview') {
+    setLiveInterviewLayout(true);
     navLiveInterview.className = NAV_LIVE_ACTIVE;
     tabLiveInterviewContent.classList.remove('hidden');
   } else if (tabName === 'class-analytics') {
+    setLiveInterviewLayout(false);
     navClassAnalytics.className = NAV_ACTIVE;
     tabClassAnalyticsContent.classList.remove('hidden');
     renderAnalytics();
+  } else {
+    setLiveInterviewLayout(false);
   }
 };
 
@@ -1824,14 +1837,19 @@ const renderDraftBanner = () => {
 };
 
 const bindLiveInterviewAutosave = () => {
-  if (liveInterviewAutosaveBound || !tabLiveInterviewContent) return;
+  if (liveInterviewAutosaveBound) return;
+  const liveForm = document.getElementById('live-interview-form');
+  const notepadAside = document.getElementById('evaluator-notepad-aside');
+  if (!liveForm) return;
   liveInterviewAutosaveBound = true;
 
-  tabLiveInterviewContent.addEventListener('input', scheduleDraftSave);
-  tabLiveInterviewContent.addEventListener('change', scheduleDraftSave);
-  tabLiveInterviewContent.addEventListener('click', (event) => {
-    if (event.target.closest('.btn-score-select, .btn-likert-choice')) scheduleDraftSave();
+  const onAutosave = () => scheduleDraftSave();
+  liveForm.addEventListener('input', onAutosave);
+  liveForm.addEventListener('change', onAutosave);
+  liveForm.addEventListener('click', (event) => {
+    if (event.target.closest('.rating-btn, .likert-btn, .btn-score-select, .btn-likert-choice')) onAutosave();
   });
+  notepadAside?.addEventListener('input', onAutosave);
 };
 
 const restoreInterviewFromDraft = (draft) => {
@@ -2462,29 +2480,28 @@ const renderLiveInterviewSheet = () => {
     const row = document.createElement('div');
     row.className = 'criteria-card';
     row.innerHTML = `
-      <div class="criteria-card__header flex items-center justify-between gap-4">
-        <div class="criteria-card__meta flex items-center gap-3 flex-1 min-w-0">
+      <div class="criteria-card__header">
+        <div class="criteria-card__meta">
           <span class="criteria-card__num">${idx + 1}</span>
-          <div class="flex-1 min-w-0">
-            <input type="text" class="live-crit-name-input font-bold text-slate-900 text-sm bg-transparent border-b border-dashed border-slate-300 hover:border-slate-500 focus:border-indigo-500 focus:outline-none w-full"
-              value="${c.name}" placeholder="Criteria Name" title="Click to rename criteria">
-            <input type="text" class="live-crit-desc-input text-xs text-slate-500 bg-transparent border-b border-dashed border-slate-200 hover:border-slate-400 focus:border-indigo-500 focus:outline-none w-full mt-1 italic"
-              value="${c.desc || ''}" placeholder="Explain expectations or guidelines..." title="Click to edit explanation">
+          <div class="criteria-card__text">
+            <input type="text" class="live-crit-name-input"
+              value="${escapeHtml(c.name)}" placeholder="Criteria name" title="Click to rename criteria">
+            <textarea class="live-crit-desc-input" rows="2" placeholder="Explain expectations or what to observe in the interview…" title="Guidance for evaluators">${escapeHtml(c.desc || '')}</textarea>
           </div>
         </div>
-        <div class="flex items-center gap-3 flex-shrink-0">
-          <div class="flex items-center gap-1 text-xs text-slate-500 bg-slate-100/90 border border-slate-200 px-2.5 py-1 rounded-full shadow-sm hover:bg-slate-200 transition-colors">
-            <span class="font-bold text-[9px] uppercase tracking-wider text-slate-400">Weight:</span>
-            <input type="number" class="live-crit-weight-input w-9 text-center bg-transparent focus:outline-none font-bold text-slate-700 tabular-nums"
-              min="0" max="100" value="${c.weight}" title="Adjust criteria weight percentage">%
-          </div>
-          <button type="button" class="btn-delete-live-crit flex h-7 w-7 items-center justify-center text-rose-500 hover:bg-rose-50 rounded-full border border-transparent hover:border-rose-200 transition font-bold" title="Remove this criteria card">✕</button>
+        <div class="criteria-card__actions">
+          <label class="criteria-card__weight-wrap">
+            <span class="font-bold text-[9px] uppercase tracking-wider text-slate-400">Weight</span>
+            <input type="number" class="live-crit-weight-input" min="0" max="100" value="${c.weight}" title="Criteria weight %" aria-label="Weight percentage">
+            <span>%</span>
+          </label>
+          <button type="button" class="btn-delete-live-crit flex h-8 w-8 items-center justify-center text-rose-600 hover:bg-rose-50 rounded-full border border-rose-200 transition font-bold text-sm" title="Remove this criterion" aria-label="Remove criterion">✕</button>
         </div>
       </div>
 
       <div class="criteria-card__ratings">
-        <span class="criteria-card__ratings-label">Rating</span>
-        <div class="rating-btn-group">
+        <span class="criteria-card__ratings-label">Select a rating</span>
+        <div class="rating-btn-group" role="group" aria-label="Rating for ${escapeHtml(c.name)}">
           ${[
             { rate: 'NS', label: 'Not Satisfactory'  },
             { rate: 'S',  label: 'Satisfactory'      },
@@ -2519,7 +2536,14 @@ const renderLiveInterviewSheet = () => {
 
     row.querySelector('.live-crit-desc-input').addEventListener('input', (e) => {
       c.desc = e.target.value;
+      e.target.style.height = 'auto';
+      e.target.style.height = `${e.target.scrollHeight}px`;
     });
+    const descEl = row.querySelector('.live-crit-desc-input');
+    if (descEl) {
+      descEl.style.height = 'auto';
+      descEl.style.height = `${descEl.scrollHeight}px`;
+    }
 
     row.querySelector('.live-crit-weight-input').addEventListener('input', (e) => {
       c.weight = Number(e.target.value || 0);
