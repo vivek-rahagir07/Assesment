@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, getDoc, setDoc, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const app_id = typeof __app_id !== 'undefined' ? __app_id : 'interview-evaluator-pro';
 const rawFirebaseConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
@@ -27,6 +27,11 @@ let wsMode = null; // 'enter' | 'create'
 let templates = [];
 let candidates = [];
 let activeInterviewTemplate = null;
+let activePanelCaseId = null;
+let activePanelCase = null;
+let panelScorecards = [];
+let panelTemplateForCreate = null;
+let unsubscribePanelScorecards = null;
 let candidateScores = {};
 let candidateNotes = {};
 let likertResponses = {};
@@ -535,6 +540,11 @@ const enterWorkspace = (wsName) => {
     loadInterviewDraft().then(() => renderDraftBanner());
     setupFirestoreSync();
     switchTab('dashboard');
+
+    const panelCodeParam = new URLSearchParams(window.location.search).get('panel');
+    if (panelCodeParam) {
+      setTimeout(() => joinPanelByCode(panelCodeParam), 400);
+    }
   } catch (e) {
     console.error('Error loading workspace:', e);
   }
@@ -544,6 +554,7 @@ btnSwitchWs.addEventListener('click', () => {
   if (activeInterviewTemplate && !window.confirm('Leave workspace? Your active interview will be discarded.')) return;
 
   cleanupActiveInterview(true);
+  teardownPanelListeners();
   currentWorkspace = null;
   wsMode = null;
   workspaceEntryCard.classList.remove('hidden');
@@ -664,6 +675,606 @@ const computeScoreBreakdown = (scores, rubrics, likerts) => {
 const evaluateOverallPerformanceScore = (scores, rubrics, likerts) => {
   return computeScoreBreakdown(scores, rubrics, likerts).finalScore;
 };
+
+// ── Panel mode (multi-evaluator + join code) ──
+
+const PANEL_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+const panelCreateModal = document.getElementById('panel-create-modal');
+const panelJoinModal = document.getElementById('panel-join-modal');
+const panelHubModal = document.getElementById('panel-hub-modal');
+const panelCreateForm = document.getElementById('panel-create-form');
+const panelJoinForm = document.getElementById('panel-join-form');
+const panelJoinCodeInput = document.getElementById('panel-join-code-input');
+const panelJoinError = document.getElementById('panel-join-error');
+const panelHubCodeDisplay = document.getElementById('panel-hub-code-display');
+const panelHubScorecardsList = document.getElementById('panel-hub-scorecards-list');
+const panelHubCompiled = document.getElementById('panel-hub-compiled');
+const panelHubCompiledScore = document.getElementById('panel-hub-compiled-score');
+const panelHubCompiledMeta = document.getElementById('panel-hub-compiled-meta');
+const panelHubSubtitle = document.getElementById('panel-hub-subtitle');
+const panelModeBanner = document.getElementById('panel-mode-banner');
+const panelLiveCode = document.getElementById('panel-live-code');
+const panelLiveStatus = document.getElementById('panel-live-status');
+const liveSubmitText = document.getElementById('live-submit-text');
+const panelCreateTemplateName = document.getElementById('panel-create-template-name');
+
+const evaluationsCollectionRef = () => collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'evaluations');
+const evaluationDocRef = (caseId) => doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'evaluations', caseId);
+const scorecardsCollectionRef = (caseId) => collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'evaluations', caseId, 'scorecards');
+const scorecardDocRef = (caseId, uid) => doc(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'evaluations', caseId, 'scorecards', uid);
+
+const generatePanelJoinCode = () => {
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += PANEL_CODE_CHARS[Math.floor(Math.random() * PANEL_CODE_CHARS.length)];
+  }
+  return code;
+};
+
+const isPanelModeActive = () => Boolean(activePanelCaseId);
+
+const setLiveInterviewPanelUI = (enabled) => {
+  panelModeBanner?.classList.toggle('hidden', !enabled);
+  if (liveSubmitText) {
+    liveSubmitText.textContent = enabled
+      ? 'Submit my scorecard'
+      : 'Complete & Save Calibration';
+  }
+  const nameInput = document.getElementById('candidate-name');
+  const roleInput = document.getElementById('candidate-role');
+  if (nameInput) nameInput.readOnly = enabled;
+  if (roleInput) roleInput.readOnly = enabled;
+};
+
+const openPanelModal = (id) => {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('hidden');
+};
+
+const closePanelModal = (id) => {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('hidden');
+};
+
+document.querySelectorAll('[data-panel-close]').forEach((el) => {
+  el.addEventListener('click', () => closePanelModal(el.getAttribute('data-panel-close')));
+});
+
+const compilePanelAverage = (scorecards) => {
+  const submitted = scorecards.filter((s) => s.status === 'submitted' && s.calculatedScore != null);
+  if (!submitted.length) return null;
+
+  const scores = submitted.map((s) => Number(s.calculatedScore));
+  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+
+  return {
+    compiledScore: Math.round(mean * 10) / 10,
+    scorecardCount: submitted.length,
+    min: Math.round(min * 10) / 10,
+    max: Math.round(max * 10) / 10,
+    spread: Math.round((max - min) * 10) / 10,
+    perInterviewer: submitted.map((s) => ({
+      name: s.interviewerName || 'Evaluator',
+      score: s.calculatedScore
+    }))
+  };
+};
+
+const recompilePanelCase = async (caseId) => {
+  if (!caseId || !currentWorkspace) return;
+  try {
+    const snap = await getDocs(scorecardsCollectionRef(caseId));
+    const cards = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    panelScorecards = cards;
+    const compiled = compilePanelAverage(cards);
+    const caseSnap = await getDoc(evaluationDocRef(caseId));
+    if (caseSnap.exists() && caseSnap.data().status !== 'finalized') {
+      await updateDoc(evaluationDocRef(caseId), {
+        compiled: compiled || null,
+        compiledAt: new Date().toISOString()
+      });
+      if (activePanelCase) activePanelCase.compiled = compiled;
+    }
+    renderPanelHubContent();
+  } catch (err) {
+    console.error('Panel recompile failed:', err);
+  }
+};
+
+const teardownPanelListeners = () => {
+  if (unsubscribePanelScorecards) {
+    unsubscribePanelScorecards();
+    unsubscribePanelScorecards = null;
+  }
+  activePanelCaseId = null;
+  activePanelCase = null;
+  panelScorecards = [];
+};
+
+const subscribePanelScorecards = (caseId) => {
+  if (unsubscribePanelScorecards) unsubscribePanelScorecards();
+  unsubscribePanelScorecards = onSnapshot(scorecardsCollectionRef(caseId), async (snap) => {
+    panelScorecards = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (activePanelCase?.status !== 'finalized') {
+      const compiled = compilePanelAverage(panelScorecards);
+      activePanelCase.compiled = compiled;
+      try {
+        await updateDoc(evaluationDocRef(caseId), {
+          compiled: compiled || null,
+          compiledAt: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error('Panel compile update:', err);
+      }
+    }
+    renderPanelHubContent();
+    updatePanelLiveBanner();
+  }, (err) => console.error('Panel scorecards listener:', err));
+};
+
+const renderPanelHubContent = () => {
+  if (!activePanelCase) return;
+
+  if (panelHubCodeDisplay) panelHubCodeDisplay.textContent = activePanelCase.joinCode || '------';
+  if (panelHubSubtitle) {
+    panelHubSubtitle.textContent = `${activePanelCase.candidateName} · ${activePanelCase.templateSnapshot?.title || 'Rubric'}`;
+  }
+
+  const compiled = activePanelCase.compiled;
+  if (panelHubCompiled && panelHubCompiledScore && panelHubCompiledMeta) {
+    if (compiled?.compiledScore != null) {
+      panelHubCompiled.classList.remove('hidden');
+      panelHubCompiledScore.textContent = compiled.compiledScore;
+      panelHubCompiledMeta.textContent = `${compiled.scorecardCount} submitted · range ${compiled.min}%–${compiled.max}% (spread ${compiled.spread}%)`;
+    } else {
+      panelHubCompiled.classList.add('hidden');
+    }
+  }
+
+  if (!panelHubScorecardsList) return;
+  panelHubScorecardsList.innerHTML = '';
+
+  if (panelScorecards.length === 0) {
+    panelHubScorecardsList.innerHTML = '<li class="text-xs text-slate-500 py-2">No scorecards yet — share the code so evaluators can join.</li>';
+    return;
+  }
+
+  panelScorecards.forEach((card) => {
+    const li = document.createElement('li');
+    const status = card.status === 'submitted' ? 'submitted' : 'draft';
+    li.className = `panel-scorecard-item panel-scorecard-item--${status}`;
+    const scoreLabel = card.status === 'submitted' ? `${card.calculatedScore}%` : 'In progress';
+    li.innerHTML = `
+      <span><strong>${escapeHtml(card.interviewerName || 'Evaluator')}</strong>${card.id === user?.uid ? ' <span class="text-violet-600">(you)</span>' : ''}</span>
+      <span class="font-bold tabular-nums">${scoreLabel}</span>
+    `;
+    panelHubScorecardsList.appendChild(li);
+  });
+
+  const submittedCount = panelScorecards.filter((c) => c.status === 'submitted').length;
+  const btnFinalize = document.getElementById('btn-finalize-panel');
+  if (btnFinalize) {
+    btnFinalize.disabled = activePanelCase.status === 'finalized' || submittedCount === 0;
+    btnFinalize.textContent = activePanelCase.status === 'finalized'
+      ? 'Already finalized'
+      : 'Finalize & save to analytics';
+  }
+};
+
+const openPanelHub = async (caseId) => {
+  if (!currentWorkspace || !user) return;
+  try {
+    const snap = await getDoc(evaluationDocRef(caseId));
+    if (!snap.exists()) {
+      showToast('Panel session not found.', 'error');
+      return;
+    }
+    activePanelCaseId = caseId;
+    activePanelCase = { id: caseId, ...snap.data() };
+    subscribePanelScorecards(caseId);
+    renderPanelHubContent();
+    openPanelModal('panel-hub-modal');
+  } catch (err) {
+    console.error(err);
+    showToast('Could not open panel session.', 'error');
+  }
+};
+
+const ensureUniqueJoinCode = async () => {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = generatePanelJoinCode();
+    const q = query(evaluationsCollectionRef(), where('joinCode', '==', code));
+    const snap = await getDocs(q);
+    if (snap.empty) return code;
+  }
+  throw new Error('Could not generate a unique session code. Try again.');
+};
+
+const createPanelEvaluation = async (template, candidateName, candidateRole) => {
+  if (!user || !currentWorkspace) {
+    showToast('Sign in to a workspace first.', 'error');
+    return null;
+  }
+
+  const joinCode = await ensureUniqueJoinCode();
+  const templateSnapshot = {
+    id: template.id,
+    title: template.title,
+    role: template.role || '',
+    description: template.description || '',
+    criteria: (template.criteria || []).map((c) => ({ ...c }))
+  };
+
+  const caseData = {
+    joinCode,
+    candidateName: candidateName.trim(),
+    candidateRole: (candidateRole || template.role || '').trim(),
+    templateId: template.id,
+    templateSnapshot,
+    status: 'open',
+    createdAt: new Date().toISOString(),
+    createdBy: user.uid,
+    hostUid: user.uid,
+    compiled: null
+  };
+
+  const caseRef = await addDoc(evaluationsCollectionRef(), caseData);
+  activePanelCaseId = caseRef.id;
+  activePanelCase = { id: caseRef.id, ...caseData };
+
+  subscribePanelScorecards(caseRef.id);
+  closePanelModal('panel-create-modal');
+  openPanelModal('panel-hub-modal');
+  renderPanelHubContent();
+  showToast(`Panel created. Share code: ${joinCode}`, 'success');
+  return caseRef.id;
+};
+
+const joinPanelByCode = async (rawCode) => {
+  if (!user || !currentWorkspace) {
+    showToast('Enter a workspace before joining a panel.', 'error');
+    return null;
+  }
+
+  const code = String(rawCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 6) {
+    if (panelJoinError) {
+      panelJoinError.textContent = 'Enter a valid 6-character code.';
+      panelJoinError.classList.remove('hidden');
+    }
+    return null;
+  }
+
+  try {
+    const q = query(evaluationsCollectionRef(), where('joinCode', '==', code));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      if (panelJoinError) {
+        panelJoinError.textContent = 'No active panel found with that code in this workspace.';
+        panelJoinError.classList.remove('hidden');
+      }
+      return null;
+    }
+
+    const caseDoc = snap.docs[0];
+    if (caseDoc.data().status === 'finalized') {
+      if (panelJoinError) {
+        panelJoinError.textContent = 'This panel session is already finalized.';
+        panelJoinError.classList.remove('hidden');
+      }
+      return null;
+    }
+
+    activePanelCaseId = caseDoc.id;
+    activePanelCase = { id: caseDoc.id, ...caseDoc.data() };
+    subscribePanelScorecards(caseDoc.id);
+    closePanelModal('panel-join-modal');
+    if (panelJoinError) panelJoinError.classList.add('hidden');
+    openPanelModal('panel-hub-modal');
+    renderPanelHubContent();
+    showToast('Joined panel session.', 'success');
+    return caseDoc.id;
+  } catch (err) {
+    console.error(err);
+    showToast('Could not join panel. Check your connection.', 'error');
+    return null;
+  }
+};
+
+const loadScorecardIntoLiveForm = (card) => {
+  document.getElementById('candidate-name').value = activePanelCase?.candidateName || '';
+  document.getElementById('candidate-role').value = activePanelCase?.candidateRole || '';
+  document.getElementById('interviewer-name').value = card?.interviewerName || '';
+  document.getElementById('date-of-interview').value = card?.date || new Date().toISOString().split('T')[0];
+  document.getElementById('candidate-strengths').value = card?.strengths || '';
+  document.getElementById('candidate-weaknesses').value = card?.weaknesses || '';
+  document.getElementById('overall-feedback').value = card?.overallFeedback || '';
+  document.getElementById('local-scratchpad').value = card?.scratchpad || '';
+
+  candidateScores = { ...(card?.scores || {}) };
+  candidateNotes = { ...(card?.notes || {}) };
+  likertResponses = { ...(card?.likertAnswers || {}) };
+  interviewDuration = card?.durationSeconds || 0;
+};
+
+const startPanelScorecardSession = async () => {
+  if (!activePanelCaseId || !activePanelCase || !user) return;
+
+  if (activePanelCase.status === 'finalized') {
+    showToast('This panel is finalized. No more scorecards can be submitted.', 'error');
+    return;
+  }
+
+  const tpl = activePanelCase.templateSnapshot;
+  activeInterviewTemplate = {
+    id: tpl.id,
+    title: tpl.title,
+    role: tpl.role,
+    description: tpl.description,
+    criteria: tpl.criteria || []
+  };
+
+  let cardData = null;
+  try {
+    const snap = await getDoc(scorecardDocRef(activePanelCaseId, user.uid));
+    if (snap.exists()) cardData = snap.data();
+  } catch (err) {
+    console.error(err);
+  }
+
+  if (cardData?.status === 'submitted') {
+    if (!window.confirm('You already submitted a scorecard. Open again to edit and resubmit?')) return;
+  }
+
+  loadScorecardIntoLiveForm(cardData);
+
+  candidateScores = candidateScores || {};
+  candidateNotes = candidateNotes || {};
+  activeInterviewTemplate.criteria.forEach((c) => {
+    if (candidateNotes[c.id] === undefined) candidateNotes[c.id] = '';
+  });
+
+  if (!cardData) {
+    document.getElementById('interviewer-name').value = '';
+    document.getElementById('date-of-interview').value = new Date().toISOString().split('T')[0];
+    likertResponses = {};
+  }
+
+  clearInterval(timerInterval);
+  updateLiveTimerDisplay(interviewDuration);
+  timerInterval = setInterval(() => {
+    interviewDuration++;
+    updateLiveTimerDisplay(interviewDuration);
+    if (interviewDuration % 30 === 0) scheduleDraftSave();
+  }, 1000);
+
+  navActiveCandidateName.textContent = activePanelCase.candidateName;
+  navActiveAssessmentContainer.classList.remove('hidden');
+  setLiveInterviewPanelUI(true);
+  if (panelLiveCode) panelLiveCode.textContent = activePanelCase.joinCode;
+  updatePanelLiveBanner();
+  renderLiveInterviewSheet();
+  bindLiveInterviewAutosave();
+  closePanelModal('panel-hub-modal');
+  switchTab('live-interview');
+};
+
+const updatePanelLiveBanner = () => {
+  if (!panelLiveStatus || !activePanelCaseId) return;
+  const submitted = panelScorecards.filter((c) => c.status === 'submitted').length;
+  const total = panelScorecards.length;
+  const compiled = activePanelCase?.compiled;
+  let text = `${submitted} of ${total} scorecard${total !== 1 ? 's' : ''} submitted`;
+  if (compiled?.compiledScore != null) text += ` · team average ${compiled.compiledScore}%`;
+  panelLiveStatus.textContent = text;
+};
+
+const savePanelScorecardDraft = async () => {
+  if (!activePanelCaseId || !user || !activeInterviewTemplate) return;
+
+  const interviewerName = document.getElementById('interviewer-name')?.value?.trim() || 'Evaluator';
+  const calculatedScore = evaluateOverallPerformanceScore(
+    candidateScores,
+    activeInterviewTemplate.criteria,
+    likertResponses
+  );
+
+  const payload = {
+    interviewerId: user.uid,
+    interviewerName,
+    status: 'draft',
+    scores: { ...candidateScores },
+    notes: { ...candidateNotes },
+    likertAnswers: { ...likertResponses },
+    strengths: document.getElementById('candidate-strengths')?.value || '',
+    weaknesses: document.getElementById('candidate-weaknesses')?.value || '',
+    overallFeedback: document.getElementById('overall-feedback')?.value || '',
+    scratchpad: document.getElementById('local-scratchpad')?.value || '',
+    date: document.getElementById('date-of-interview')?.value || '',
+    calculatedScore,
+    durationSeconds: interviewDuration,
+    updatedAt: new Date().toISOString()
+  };
+
+  try {
+    await setDoc(scorecardDocRef(activePanelCaseId, user.uid), payload, { merge: true });
+  } catch (err) {
+    console.error('Panel draft save failed:', err);
+  }
+};
+
+const submitPanelScorecard = async () => {
+  if (!activePanelCaseId || !user || !activeInterviewTemplate) return false;
+
+  const interviewerName = document.getElementById('interviewer-name')?.value?.trim();
+  if (!interviewerName) {
+    showToast('Enter your name as the interviewer before submitting.', 'error');
+    document.getElementById('interviewer-name')?.focus();
+    return false;
+  }
+
+  const calculatedScore = evaluateOverallPerformanceScore(
+    candidateScores,
+    activeInterviewTemplate.criteria,
+    likertResponses
+  );
+
+  const payload = {
+    interviewerId: user.uid,
+    interviewerName,
+    status: 'submitted',
+    scores: { ...candidateScores },
+    notes: { ...candidateNotes },
+    likertAnswers: { ...likertResponses },
+    strengths: document.getElementById('candidate-strengths')?.value || '',
+    weaknesses: document.getElementById('candidate-weaknesses')?.value || '',
+    overallFeedback: document.getElementById('overall-feedback')?.value || '',
+    date: document.getElementById('date-of-interview')?.value || '',
+    calculatedScore,
+    durationSeconds: interviewDuration,
+    submittedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  await setDoc(scorecardDocRef(activePanelCaseId, user.uid), payload, { merge: true });
+  await recompilePanelCase(activePanelCaseId);
+  return true;
+};
+
+const finalizePanelEvaluation = async () => {
+  if (!activePanelCaseId || !activePanelCase || !user) return;
+
+  const caseSnap = await getDoc(evaluationDocRef(activePanelCaseId));
+  if (!caseSnap.exists()) return;
+  const caseData = caseSnap.data();
+  if (caseData.status === 'finalized') {
+    showToast('This panel is already finalized.', 'info');
+    return;
+  }
+
+  await recompilePanelCase(activePanelCaseId);
+  const refreshed = await getDoc(evaluationDocRef(activePanelCaseId));
+  const data = refreshed.data();
+  const compiled = data?.compiled;
+
+  if (!compiled?.scorecardCount) {
+    showToast('At least one evaluator must submit a scorecard before finalizing.', 'error');
+    return;
+  }
+
+  if (!window.confirm(`Finalize panel for ${data.candidateName}? This saves the compiled average (${compiled.compiledScore}%) to analytics.`)) return;
+
+  const criteria = data.templateSnapshot?.criteria || [];
+  const hostCard = panelScorecards.find((c) => c.id === data.hostUid) || panelScorecards[0];
+
+  const candidateData = {
+    name: data.candidateName,
+    role: data.candidateRole || 'General Profile',
+    interviewer: panelScorecards.map((c) => c.interviewerName).filter(Boolean).join(', ') || 'Panel',
+    date: hostCard?.date || new Date().toISOString().split('T')[0],
+    templateTitle: data.templateSnapshot?.title || '',
+    templateCriteria: criteria.map((c) => ({ ...c })),
+    scores: hostCard?.scores || {},
+    notes: hostCard?.notes || {},
+    likertAnswers: hostCard?.likertAnswers || {},
+    strengths: hostCard?.strengths || '',
+    weaknesses: hostCard?.weaknesses || '',
+    overallFeedback: hostCard?.overallFeedback || '',
+    durationSeconds: hostCard?.durationSeconds || 0,
+    calculatedScore: compiled.compiledScore,
+    evaluatedAt: new Date().toISOString(),
+    isPanelEvaluation: true,
+    panelJoinCode: data.joinCode,
+    panelEvaluationId: activePanelCaseId,
+    panelCompiled: compiled,
+    panelScorecards: panelScorecards.map((c) => ({
+      interviewerName: c.interviewerName,
+      calculatedScore: c.calculatedScore,
+      status: c.status
+    }))
+  };
+
+  try {
+    await addDoc(collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates'), candidateData);
+    await updateDoc(evaluationDocRef(activePanelCaseId), {
+      status: 'finalized',
+      finalizedAt: new Date().toISOString(),
+      finalizedBy: user.uid
+    });
+    activePanelCase.status = 'finalized';
+    showToast(`Panel finalized — ${data.candidateName} at ${compiled.compiledScore}% (average of ${compiled.scorecardCount})`);
+    closePanelModal('panel-hub-modal');
+    cleanupActiveInterview(true);
+    switchTab('class-analytics');
+  } catch (err) {
+    console.error(err);
+    showToast('Could not finalize panel.', 'error');
+  }
+};
+
+const openPanelCreateModal = (template) => {
+  panelTemplateForCreate = template;
+  if (panelCreateTemplateName) panelCreateTemplateName.textContent = template.title;
+  document.getElementById('panel-create-candidate-name').value = '';
+  document.getElementById('panel-create-candidate-role').value = template.role || '';
+  openPanelModal('panel-create-modal');
+  setTimeout(() => document.getElementById('panel-create-candidate-name')?.focus(), 200);
+};
+
+panelCreateForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!panelTemplateForCreate) return;
+  const name = document.getElementById('panel-create-candidate-name')?.value?.trim();
+  const role = document.getElementById('panel-create-candidate-role')?.value?.trim();
+  if (!name) {
+    showToast('Enter the candidate name.', 'error');
+    return;
+  }
+  await createPanelEvaluation(panelTemplateForCreate, name, role);
+});
+
+panelJoinForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await joinPanelByCode(panelJoinCodeInput?.value);
+});
+
+panelJoinCodeInput?.addEventListener('input', () => {
+  if (panelJoinCodeInput) {
+    panelJoinCodeInput.value = panelJoinCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  }
+  panelJoinError?.classList.add('hidden');
+});
+
+document.getElementById('btn-join-panel-dashboard')?.addEventListener('click', () => {
+  if (!currentWorkspace) {
+    showToast('Enter a workspace first.', 'error');
+    return;
+  }
+  if (panelJoinCodeInput) panelJoinCodeInput.value = '';
+  panelJoinError?.classList.add('hidden');
+  openPanelModal('panel-join-modal');
+  setTimeout(() => panelJoinCodeInput?.focus(), 200);
+});
+
+document.getElementById('btn-copy-panel-code')?.addEventListener('click', () => {
+  const code = activePanelCase?.joinCode || panelHubCodeDisplay?.textContent;
+  if (!code) return;
+  const text = `Join my TalentCalibrate panel evaluation.\nWorkspace: ${currentWorkspace}\nSession code: ${code}`;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => showToast('Code and instructions copied!'));
+  } else {
+    showToast(`Session code: ${code}`, 'info');
+  }
+});
+
+document.getElementById('btn-start-my-scorecard')?.addEventListener('click', () => startPanelScorecardSession());
+document.getElementById('btn-finalize-panel')?.addEventListener('click', () => finalizePanelEvaluation());
+document.getElementById('btn-open-panel-hub-from-live')?.addEventListener('click', () => {
+  if (activePanelCaseId) openPanelHub(activePanelCaseId);
+});
 
 const getPerformerCategory = (score) => {
   if (score >= scoreThresholds.high) return { label: 'Top Performer', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
@@ -1061,6 +1672,32 @@ const getDraftStorageKey = () => {
 
 const collectLiveInterviewState = () => {
   if (!activeInterviewTemplate) return null;
+  if (isPanelModeActive()) {
+    return {
+      panelCaseId: activePanelCaseId,
+      candidateName: activePanelCase?.candidateName,
+      candidateRole: activePanelCase?.candidateRole,
+      interviewerName: document.getElementById('interviewer-name')?.value || '',
+      dateOfInterview: document.getElementById('date-of-interview')?.value || '',
+      candidateScores: { ...candidateScores },
+      candidateNotes: { ...candidateNotes },
+      likertResponses: { ...likertResponses },
+      strengths: document.getElementById('candidate-strengths')?.value || '',
+      weaknesses: document.getElementById('candidate-weaknesses')?.value || '',
+      overallFeedback: document.getElementById('overall-feedback')?.value || '',
+      scratchpad: document.getElementById('local-scratchpad')?.value || '',
+      durationSeconds: interviewDuration,
+      savedAt: new Date().toISOString(),
+      userId: user?.uid,
+      templateSnapshot: {
+        id: activeInterviewTemplate.id,
+        title: activeInterviewTemplate.title,
+        role: activeInterviewTemplate.role || '',
+        description: activeInterviewTemplate.description || '',
+        criteria: activeInterviewTemplate.criteria?.map((c) => ({ ...c })) || []
+      }
+    };
+  }
   return {
     templateSnapshot: {
       id: activeInterviewTemplate.id,
@@ -1087,10 +1724,15 @@ const collectLiveInterviewState = () => {
 };
 
 const saveInterviewDraft = async () => {
+  if (isPanelModeActive()) {
+    await savePanelScorecardDraft();
+    return;
+  }
+
   const draft = collectLiveInterviewState();
   if (!draft || !currentWorkspace || !user) return;
 
-  const hasContent = draft.candidateName.trim()
+  const hasContent = draft.candidateName?.trim()
     || Object.keys(draft.candidateScores).length > 0
     || Object.keys(draft.likertResponses).length > 0
     || draft.strengths || draft.weaknesses || draft.overallFeedback;
@@ -1731,13 +2373,15 @@ const renderTemplates = () => {
           <button class="btn-edit-tpl p-2 text-slate-500 hover:bg-slate-100 rounded-full" title="Edit template fields">✎</button>
           <button class="btn-delete-tpl p-2 text-rose-500 hover:bg-rose-50 rounded-full" title="Delete template">🗑</button>
         </div>
-        <button class="btn-launch-interview bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-full transition shadow-sm">Launch Assessment Sheet</button>
+        <button class="btn-panel-mode rounded-full border border-violet-300 bg-violet-50 text-violet-800 text-xs font-bold px-3 py-2 hover:bg-violet-100 transition" title="Multi-evaluator panel with share code">Panel Mode</button>
+        <button class="btn-launch-interview bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-full transition shadow-sm">Solo Interview</button>
       </div>
     `;
 
     card.querySelector('.btn-edit-tpl').addEventListener('click', () => triggerEditTemplate(tpl));
     card.querySelector('.btn-delete-tpl').addEventListener('click', () => handleDeleteTemplate(tpl.id));
     card.querySelector('.btn-launch-interview').addEventListener('click', () => handleStartInterview(tpl));
+    card.querySelector('.btn-panel-mode').addEventListener('click', () => openPanelCreateModal(tpl));
 
     templatesGrid.appendChild(card);
   });
@@ -2020,8 +2664,9 @@ const renderAnalytics = () => {
     row.className = 'hover:bg-slate-50/70 transition-colors border-b border-slate-100 group';
     row.innerHTML = `
       <td class="p-4">
-        <span class="font-semibold text-slate-900 block text-sm leading-tight">${cand.name}</span>
-        <span class="text-[11px] text-slate-400 mt-0.5 block">${cand.role || '—'}</span>
+        <span class="font-semibold text-slate-900 block text-sm leading-tight">${escapeHtml(cand.name)}</span>
+        <span class="text-[11px] text-slate-400 mt-0.5 block">${escapeHtml(cand.role || '—')}</span>
+        ${cand.isPanelEvaluation ? '<span class="inline-block mt-1 rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-bold uppercase text-violet-700">Panel avg</span>' : ''}
       </td>
       <td class="p-4">
         <span class="font-medium text-slate-700 block text-sm leading-tight">${cand.interviewer || '—'}</span>
@@ -2198,6 +2843,10 @@ templateEditorForm.addEventListener('submit', async (event) => {
 const handleStartInterview = (template) => {
   if (cachedDraft?.templateSnapshot && !window.confirm('Starting a new interview will replace your saved draft on next auto-save. Continue?')) return;
 
+  activePanelCaseId = null;
+  activePanelCase = null;
+  setLiveInterviewPanelUI(false);
+
   activeInterviewTemplate = template;
   document.getElementById('candidate-name').value = '';
   document.getElementById('candidate-role').value = template.role || '';
@@ -2241,12 +2890,17 @@ document.getElementById('candidate-name').addEventListener('input', (event) => {
 });
 
 document.getElementById('btn-cancel-interview').addEventListener('click', async () => {
-  if (!window.confirm('Leave this interview? Your progress is auto-saved as a draft you can resume later.')) return;
+  const msg = isPanelModeActive()
+    ? 'Leave your scorecard? Progress is saved as a draft in this panel session.'
+    : 'Leave this interview? Your progress is auto-saved as a draft you can resume later.';
+  if (!window.confirm(msg)) return;
   await saveInterviewDraft();
-  cleanupActiveInterview();
+  const keepPanel = isPanelModeActive();
+  cleanupActiveInterview(false, keepPanel);
+  if (keepPanel && activePanelCaseId) openPanelHub(activePanelCaseId);
 });
 
-const cleanupActiveInterview = (silent = false) => {
+const cleanupActiveInterview = (silent = false, keepPanelSession = false) => {
   clearInterval(timerInterval);
   timerInterval = null;
   clearTimeout(draftSaveTimer);
@@ -2256,6 +2910,10 @@ const cleanupActiveInterview = (silent = false) => {
   likertResponses = {};
   interviewDuration = 0;
   navActiveAssessmentContainer.classList.add('hidden');
+  setLiveInterviewPanelUI(false);
+  if (!keepPanelSession) {
+    activePanelCaseId = null;
+  }
   if (!silent) switchTab('dashboard');
 };
 
@@ -2281,6 +2939,23 @@ document.getElementById('live-interview-form').addEventListener('submit', async 
 
   const submitBtn = event.target.querySelector('[type="submit"]');
   if (submitBtn) submitBtn.disabled = true;
+
+  if (isPanelModeActive()) {
+    try {
+      const ok = await submitPanelScorecard();
+      if (ok) {
+        showToast('Your scorecard was submitted. Open Panel dashboard to finalize when everyone is done.', 'success');
+        cleanupActiveInterview(false, true);
+        if (activePanelCaseId) openPanelHub(activePanelCaseId);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Could not submit scorecard.', 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+    return;
+  }
 
   const calculatedScore = evaluateOverallPerformanceScore(candidateScores, activeInterviewTemplate.criteria, likertResponses);
   const candidateData = {

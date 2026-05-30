@@ -1215,6 +1215,126 @@ select:focus-visible {
   }
 }
 
+/* ── Panel mode modals ── */
+
+.panel-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .panel-modal {
+    align-items: center;
+  }
+}
+
+.panel-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.panel-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 26rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  border: 1px solid #e2e8f0;
+}
+
+.panel-modal-panel--wide {
+  max-width: 32rem;
+}
+
+.panel-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.panel-modal-body {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.panel-modal-close {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.panel-modal-close:hover {
+  background: #f1f5f9;
+}
+
+.panel-code-box {
+  text-align: center;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 100%);
+  border: 1.5px dashed #c4b5fd;
+}
+
+.panel-code-value {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.2em;
+  color: #5b21b6;
+  margin-top: 0.5rem;
+}
+
+.panel-scorecard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.panel-scorecard-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 0.8125rem;
+}
+
+.panel-scorecard-item--submitted {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.panel-scorecard-item--draft {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
 /* ── Candidate detail modal ── */
 
 .candidate-modal {
