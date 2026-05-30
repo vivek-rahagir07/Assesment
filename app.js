@@ -101,6 +101,15 @@ const analyticsSearch = document.getElementById('analytics-search');
 const analyticsRoleFilter = document.getElementById('analytics-role-filter');
 const candidatesTableBody = document.getElementById('candidates-table-body');
 const distributionChartWrapper = document.getElementById('distribution-chart-wrapper');
+const btnToggleDashboard = document.getElementById('btn-toggle-dashboard');
+const btnCloseDashboard = document.getElementById('btn-close-dashboard');
+const btnExportCsv = document.getElementById('btn-export-csv');
+const btnExportExcel = document.getElementById('btn-export-excel');
+const analyticsDashboardPanel = document.getElementById('analytics-dashboard-panel');
+const dashboardStatsGrid = document.getElementById('dashboard-stats-grid');
+
+let chartInstances = {};
+let dashboardVisible = false;
 
 const showToast = (message, type = 'success') => {
   toastMsg.textContent = message;
@@ -342,6 +351,9 @@ const enterWorkspace = (wsName) => {
   filterRole = 'All';
   filterQuery = '';
   if (analyticsSearch) analyticsSearch.value = '';
+  dashboardVisible = false;
+  analyticsDashboardPanel?.classList.add('hidden');
+  Object.keys(chartInstances).forEach(destroyChart);
   legacyCleanupDone = false;
   setupFirestoreSync();
   switchTab('dashboard');
@@ -370,6 +382,9 @@ btnSwitchWs.addEventListener('click', () => {
   templates = [];
   candidates = [];
   legacyCleanupDone = false;
+  dashboardVisible = false;
+  analyticsDashboardPanel?.classList.add('hidden');
+  Object.keys(chartInstances).forEach(destroyChart);
   renderTemplates();
   renderAnalytics();
 });
@@ -442,6 +457,299 @@ const getPerformerCategory = (score) => {
   if (score >= scoreThresholds.high) return { label: 'Top Performer', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
   if (score < scoreThresholds.low) return { label: 'Low Performer', color: 'bg-rose-100 text-rose-800 border-rose-300' };
   return { label: 'Mid Performer', color: 'bg-amber-100 text-amber-800 border-amber-300' };
+};
+
+const getFilteredCandidates = () => candidates.filter((cand) => {
+  const name = (cand.name || '').toLowerCase();
+  const interviewer = (cand.interviewer || '').toLowerCase();
+  const templateTitle = (cand.templateTitle || '').toLowerCase();
+  const query = filterQuery.toLowerCase();
+  const matchesRole = filterRole === 'All' || cand.role === filterRole;
+  const matchesSearch = !query || name.includes(query) || interviewer.includes(query) || templateTitle.includes(query);
+  return matchesRole && matchesSearch;
+});
+
+const escapeCsvCell = (value) => {
+  const str = String(value ?? '');
+  if (/[",\n\r]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+  return str;
+};
+
+const formatDuration = (seconds) => {
+  if (!seconds && seconds !== 0) return '';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
+};
+
+const buildExportRows = (list) => {
+  const scoreKeys = new Set();
+  const likertKeys = new Set();
+  list.forEach((c) => {
+    Object.keys(c.scores || {}).forEach((k) => scoreKeys.add(k));
+    Object.keys(c.likertAnswers || {}).forEach((k) => likertKeys.add(k));
+  });
+
+  const likertLabels = {};
+  MANDATORY_LIKERT_QUESTIONS.forEach((q) => { likertLabels[q.id] = q.text; });
+
+  return list.map((c) => {
+    const category = getPerformerCategory(c.calculatedScore);
+    const row = {
+      'Candidate Name': c.name || '',
+      'Position / Role': c.role || '',
+      'Interviewer': c.interviewer || '',
+      'Interview Date': c.date || '',
+      'Evaluation Template': c.templateTitle || '',
+      'Final Score (%)': c.calculatedScore ?? '',
+      'Performance Category': category.label,
+      'Strengths': c.strengths || '',
+      'Weaknesses': c.weaknesses || '',
+      'Overall Feedback': c.overallFeedback || '',
+      'Interview Duration': formatDuration(c.durationSeconds),
+      'Evaluated At': c.evaluatedAt ? new Date(c.evaluatedAt).toLocaleString() : ''
+    };
+
+    scoreKeys.forEach((key) => {
+      const label = `Criteria: ${key}`;
+      row[label] = (c.scores || {})[key] || '';
+      row[`${label} (Notes)`] = (c.notes || {})[key] || '';
+    });
+
+    likertKeys.forEach((key) => {
+      const label = likertLabels[key] ? `Likert: ${likertLabels[key]}` : `Likert: ${key}`;
+      row[label] = (c.likertAnswers || {})[key] || '';
+    });
+
+    return row;
+  });
+};
+
+const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const exportCandidatesCSV = () => {
+  const list = getFilteredCandidates();
+  if (list.length === 0) {
+    showToast('No candidate records to export.', 'error');
+    return;
+  }
+
+  const rows = buildExportRows(list);
+  const headers = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  const csvLines = [
+    headers.map(escapeCsvCell).join(','),
+    ...rows.map((row) => headers.map((h) => escapeCsvCell(row[h])).join(','))
+  ];
+  const blob = new Blob(['\uFEFF' + csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const wsSlug = (currentWorkspace || 'workspace').replace(/[^a-zA-Z0-9_-]/g, '_');
+  downloadBlob(blob, `TalentCalibrate_${wsSlug}_progress_${new Date().toISOString().slice(0, 10)}.csv`);
+  showToast(`Exported ${list.length} record${list.length > 1 ? 's' : ''} to CSV.`);
+};
+
+const exportCandidatesExcel = () => {
+  const list = getFilteredCandidates();
+  if (list.length === 0) {
+    showToast('No candidate records to export.', 'error');
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    showToast('Excel library not loaded. Use CSV export instead.', 'error');
+    return;
+  }
+
+  const rows = buildExportRows(list);
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Candidate Progress');
+  const wsSlug = (currentWorkspace || 'workspace').replace(/[^a-zA-Z0-9_-]/g, '_');
+  XLSX.writeFile(workbook, `TalentCalibrate_${wsSlug}_progress_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  showToast(`Exported ${list.length} record${list.length > 1 ? 's' : ''} to Excel.`);
+};
+
+const destroyChart = (id) => {
+  if (chartInstances[id]) {
+    chartInstances[id].destroy();
+    delete chartInstances[id];
+  }
+};
+
+const scoreBarColor = (score) => {
+  if (score >= scoreThresholds.high) return 'rgba(16, 185, 129, 0.85)';
+  if (score < scoreThresholds.low) return 'rgba(244, 63, 94, 0.85)';
+  return 'rgba(245, 158, 11, 0.85)';
+};
+
+const renderDashboardStats = (list) => {
+  if (!dashboardStatsGrid) return;
+  if (list.length === 0) {
+    dashboardStatsGrid.innerHTML = '<p class="col-span-full text-center text-xs text-slate-400 py-6">No data to display. Complete interviews first.</p>';
+    return;
+  }
+
+  const scores = list.map((c) => c.calculatedScore || 0);
+  const avg = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
+  const max = Math.max(...scores);
+  const topCount = list.filter((c) => c.calculatedScore >= scoreThresholds.high).length;
+
+  const stats = [
+    { label: 'Total Evaluations', value: list.length, bg: 'bg-indigo-50/80', border: 'border-indigo-200', labelColor: 'text-indigo-600', valueColor: 'text-indigo-900' },
+    { label: 'Average Score', value: `${avg}%`, bg: 'bg-sky-50/80', border: 'border-sky-200', labelColor: 'text-sky-600', valueColor: 'text-sky-900' },
+    { label: 'Highest Score', value: `${max}%`, bg: 'bg-emerald-50/80', border: 'border-emerald-200', labelColor: 'text-emerald-600', valueColor: 'text-emerald-900' },
+    { label: 'Top Performers', value: topCount, bg: 'bg-amber-50/80', border: 'border-amber-200', labelColor: 'text-amber-600', valueColor: 'text-amber-900' }
+  ];
+
+  dashboardStatsGrid.innerHTML = stats.map((s) => `
+    <div class="rounded-3xl border ${s.border} ${s.bg} p-4 text-center">
+      <p class="text-[10px] font-bold uppercase tracking-[0.2em] ${s.labelColor}">${s.label}</p>
+      <p class="mt-1 text-2xl font-black ${s.valueColor}">${s.value}</p>
+    </div>
+  `).join('');
+};
+
+const renderAnalyticsDashboard = () => {
+  if (!analyticsDashboardPanel || typeof Chart === 'undefined') return;
+
+  const list = getFilteredCandidates().slice().sort((a, b) => (b.calculatedScore || 0) - (a.calculatedScore || 0));
+  renderDashboardStats(list);
+
+  ['chart-scores-bar', 'chart-tier-doughnut', 'chart-role-avg', 'chart-role-count'].forEach(destroyChart);
+
+  if (list.length === 0) return;
+
+  const topT = list.filter((c) => c.calculatedScore >= scoreThresholds.high);
+  const midT = list.filter((c) => c.calculatedScore >= scoreThresholds.low && c.calculatedScore < scoreThresholds.high);
+  const lowT = list.filter((c) => c.calculatedScore < scoreThresholds.low);
+
+  const scoresCanvas = document.getElementById('chart-scores-bar');
+  if (scoresCanvas) {
+    chartInstances['chart-scores-bar'] = new Chart(scoresCanvas, {
+      type: 'bar',
+      data: {
+        labels: list.map((c) => c.name),
+        datasets: [{
+          label: 'Score (%)',
+          data: list.map((c) => c.calculatedScore),
+          backgroundColor: list.map((c) => scoreBarColor(c.calculatedScore)),
+          borderRadius: 8,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%` } },
+          x: { ticks: { maxRotation: 45, minRotation: list.length > 6 ? 45 : 0, font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  const tierCanvas = document.getElementById('chart-tier-doughnut');
+  if (tierCanvas) {
+    chartInstances['chart-tier-doughnut'] = new Chart(tierCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Top Performers', 'Mid Performers', 'Low Performers'],
+        datasets: [{
+          data: [topT.length, midT.length, lowT.length],
+          backgroundColor: ['rgba(16, 185, 129, 0.85)', 'rgba(245, 158, 11, 0.85)', 'rgba(244, 63, 94, 0.85)'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+      }
+    });
+  }
+
+  const roleMap = {};
+  list.forEach((c) => {
+    const role = c.role || 'Unspecified';
+    if (!roleMap[role]) roleMap[role] = { total: 0, count: 0 };
+    roleMap[role].total += c.calculatedScore || 0;
+    roleMap[role].count += 1;
+  });
+  const roles = Object.keys(roleMap);
+  const roleAvgs = roles.map((r) => Math.round((roleMap[r].total / roleMap[r].count) * 10) / 10);
+  const roleCounts = roles.map((r) => roleMap[r].count);
+
+  const roleAvgCanvas = document.getElementById('chart-role-avg');
+  if (roleAvgCanvas) {
+    chartInstances['chart-role-avg'] = new Chart(roleAvgCanvas, {
+      type: 'bar',
+      data: {
+        labels: roles,
+        datasets: [{
+          label: 'Avg Score (%)',
+          data: roleAvgs,
+          backgroundColor: 'rgba(99, 102, 241, 0.75)',
+          borderRadius: 8
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%` } }
+        }
+      }
+    });
+  }
+
+  const roleCountCanvas = document.getElementById('chart-role-count');
+  if (roleCountCanvas) {
+    chartInstances['chart-role-count'] = new Chart(roleCountCanvas, {
+      type: 'bar',
+      data: {
+        labels: roles,
+        datasets: [{
+          label: 'Candidates',
+          data: roleCounts,
+          backgroundColor: 'rgba(14, 165, 233, 0.75)',
+          borderRadius: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
+    });
+  }
+};
+
+const toggleAnalyticsDashboard = (show) => {
+  dashboardVisible = show;
+  if (!analyticsDashboardPanel || !btnToggleDashboard) return;
+
+  analyticsDashboardPanel.classList.toggle('hidden', !show);
+  btnToggleDashboard.innerHTML = show
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg> Hide Analytics Dashboard`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 6-10"/></svg> Open Analytics Dashboard`;
+
+  if (show) {
+    requestAnimationFrame(() => renderAnalyticsDashboard());
+  } else {
+    Object.keys(chartInstances).forEach(destroyChart);
+  }
 };
 
 const renderTemplates = () => {
@@ -676,15 +984,7 @@ const renderAnalytics = () => {
     analyticsRoleFilter.innerHTML += `<option value="${role}" ${filterRole === role ? 'selected' : ''}>${role}</option>`;
   });
 
-  const filtered = candidates.filter((cand) => {
-    const name = (cand.name || '').toLowerCase();
-    const interviewer = (cand.interviewer || '').toLowerCase();
-    const templateTitle = (cand.templateTitle || '').toLowerCase();
-    const query = filterQuery.toLowerCase();
-    const matchesRole = filterRole === 'All' || cand.role === filterRole;
-    const matchesSearch = !query || name.includes(query) || interviewer.includes(query) || templateTitle.includes(query);
-    return matchesRole && matchesSearch;
-  });
+  const filtered = getFilteredCandidates();
 
   const topT = filtered.filter((c) => c.calculatedScore >= scoreThresholds.high);
   const midT = filtered.filter((c) => c.calculatedScore >= scoreThresholds.low && c.calculatedScore < scoreThresholds.high);
@@ -699,6 +999,7 @@ const renderAnalytics = () => {
       : 'No candidates match your search or filter.';
     candidatesTableBody.innerHTML = `<tr><td colspan="7" class="p-12 text-center text-xs text-slate-400">${emptyMsg}</td></tr>`;
     renderDistributionChart([], [], [], []);
+    if (dashboardVisible) renderAnalyticsDashboard();
     return;
   }
 
@@ -734,6 +1035,8 @@ const renderAnalytics = () => {
     row.querySelector('.btn-delete-cand').addEventListener('click', () => { handleDeleteCandidate(cand.id); });
     candidatesTableBody.appendChild(row);
   });
+
+  if (dashboardVisible) renderAnalyticsDashboard();
 };
 
 const renderDistributionChart = (filteredList, topT, midT, lowT) => {
@@ -975,6 +1278,11 @@ analyticsRoleFilter.addEventListener('change', (event) => {
   filterRole = event.target.value;
   renderAnalytics();
 });
+
+btnToggleDashboard?.addEventListener('click', () => toggleAnalyticsDashboard(!dashboardVisible));
+btnCloseDashboard?.addEventListener('click', () => toggleAnalyticsDashboard(false));
+btnExportCsv?.addEventListener('click', exportCandidatesCSV);
+btnExportExcel?.addEventListener('click', exportCandidatesExcel);
 
 const createStandardTemplate = async () => {
   if (!user || !currentWorkspace) {
