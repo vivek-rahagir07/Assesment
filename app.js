@@ -36,9 +36,14 @@ let panelScorecards = [];
 let panelTemplateForCreate = null;
 let unsubscribePanelCandidates = null;
 let unsubscribePanelScorecards = null;
+let unsubscribePanelDoc = null;
+let panelJoinAutoEnter = false;
 let panelCandidateSearchQuery = '';
 let pendingImportRows = [];
 let pendingImportFileName = '';
+let importModalContext = 'panel';
+let soloRosterQueue = [];
+let soloRosterSearchQuery = '';
 let candidateScores = {};
 let candidateNotes = {};
 let likertResponses = {};
@@ -739,18 +744,42 @@ const isPanelModeActive = () => Boolean(activePanelId && activePanelCandidateId)
 
 const setLiveInterviewPanelUI = (enabled) => {
   panelModeBanner?.classList.toggle('hidden', !enabled);
+  document.getElementById('panel-candidate-fields-row')?.classList.toggle('hidden', enabled);
+  document.getElementById('panel-live-candidate-info')?.classList.toggle('hidden', !enabled);
+  if (enabled) document.getElementById('solo-roster-section')?.classList.add('hidden');
+
   if (liveSubmitText) {
     liveSubmitText.textContent = enabled
       ? 'Submit my scorecard'
       : 'Complete & Save Calibration';
   }
+
   const nameInput = document.getElementById('candidate-name');
   const roleInput = document.getElementById('candidate-role');
-  if (nameInput) nameInput.readOnly = enabled;
-  if (roleInput) roleInput.readOnly = enabled;
+  const displayName = document.getElementById('panel-live-candidate-display');
+  const displayRole = document.getElementById('panel-live-role-display');
+
   if (enabled && activePanelCandidate) {
-    if (nameInput) nameInput.value = activePanelCandidate.candidateName || '';
-    if (roleInput) roleInput.value = activePanelCandidate.candidateRole || '';
+    if (nameInput) {
+      nameInput.value = activePanelCandidate.candidateName || '';
+      nameInput.readOnly = true;
+      nameInput.removeAttribute('required');
+    }
+    if (roleInput) {
+      roleInput.value = activePanelCandidate.candidateRole || '';
+      roleInput.readOnly = true;
+    }
+    if (displayName) displayName.textContent = activePanelCandidate.candidateName || 'Candidate';
+    if (displayRole) {
+      displayRole.textContent = activePanelCandidate.candidateRole || activePanel?.templateSnapshot?.role || '';
+      displayRole.classList.toggle('hidden', !displayRole.textContent);
+    }
+  } else {
+    if (nameInput) {
+      nameInput.readOnly = false;
+      nameInput.setAttribute('required', '');
+    }
+    if (roleInput) roleInput.readOnly = false;
   }
 };
 
@@ -822,12 +851,52 @@ const teardownPanelListeners = () => {
     unsubscribePanelCandidates();
     unsubscribePanelCandidates = null;
   }
+  if (unsubscribePanelDoc) {
+    unsubscribePanelDoc();
+    unsubscribePanelDoc = null;
+  }
   activePanelId = null;
   activePanel = null;
   activePanelCandidateId = null;
   activePanelCandidate = null;
   panelCandidates = [];
   panelScorecards = [];
+  panelJoinAutoEnter = false;
+};
+
+const setPanelActiveCandidate = async (candidateId) => {
+  if (!activePanelId || !user || !candidateId) return;
+  try {
+    await updateDoc(panelDocRef(activePanelId), {
+      activeCandidateId: candidateId,
+      activeCandidateSetAt: new Date().toISOString(),
+      activeCandidateSetBy: user.uid
+    });
+    if (activePanel) activePanel.activeCandidateId = candidateId;
+  } catch (err) {
+    console.error('Could not set active interview:', err);
+  }
+};
+
+const maybeAutoEnterPanelInterview = () => {
+  if (isPanelModeActive()) return;
+  if (!activePanel?.activeCandidateId) return;
+  if (panelJoinAutoEnter || !panelHubModal?.classList.contains('hidden')) {
+    tryEnterActivePanelInterview();
+  }
+};
+
+const subscribePanelDoc = (panelId) => {
+  if (unsubscribePanelDoc) unsubscribePanelDoc();
+  unsubscribePanelDoc = onSnapshot(panelDocRef(panelId), (snap) => {
+    if (!snap.exists()) return;
+    activePanel = { id: snap.id, ...snap.data() };
+    maybeAutoEnterPanelInterview();
+    if (!panelHubModal?.classList.contains('hidden')) {
+      renderPanelHubContent();
+    }
+    updatePanelLiveBanner();
+  }, (err) => console.error('Panel doc listener:', err));
 };
 
 const subscribePanelCandidates = (panelId) => {
@@ -835,7 +904,31 @@ const subscribePanelCandidates = (panelId) => {
   unsubscribePanelCandidates = onSnapshot(panelCandidatesCollectionRef(panelId), (snap) => {
     panelCandidates = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderPanelHubContent();
+    maybeAutoEnterPanelInterview();
   }, (err) => console.error('Panel candidates listener:', err));
+};
+
+const tryEnterActivePanelInterview = async () => {
+  if (!activePanelId || !activePanel?.activeCandidateId) return false;
+
+  const cand = panelCandidates.find((c) => c.id === activePanel.activeCandidateId);
+  if (!cand || cand.status === 'finalized') return false;
+
+  if (isPanelModeActive() && activePanelCandidateId === cand.id && activeInterviewTemplate) return true;
+
+  selectPanelCandidate(cand.id);
+  const started = await startPanelScorecardSession({ silent: true });
+  if (!started) return false;
+
+  panelJoinAutoEnter = false;
+  closePanelModal('panel-join-modal');
+  closePanelModal('panel-hub-modal');
+  return true;
+};
+
+const pickPanelCandidateForInterview = async (candidateId) => {
+  selectPanelCandidate(candidateId);
+  await setPanelActiveCandidate(candidateId);
 };
 
 const subscribePanelScorecards = (panelId, candidateId) => {
@@ -903,21 +996,25 @@ const renderPanelHubContent = () => {
       filtered.forEach((cand) => {
         const li = document.createElement('li');
         const isSelected = cand.id === activePanelCandidateId;
+        const isActiveInterview = cand.id === activePanel?.activeCandidateId;
         const isFinalized = cand.status === 'finalized';
         const submitted = cand.compiled?.scorecardCount || 0;
         const avg = cand.compiled?.compiledScore;
-        li.className = `panel-scorecard-item ${isSelected ? 'ring-2 ring-violet-400' : ''} ${isFinalized ? 'opacity-75' : ''}`;
+        li.className = `panel-scorecard-item ${isSelected ? 'ring-2 ring-violet-400' : ''} ${isFinalized ? 'opacity-75' : ''} ${isActiveInterview ? 'ring-2 ring-rose-300 bg-rose-50/50' : ''}`;
         li.innerHTML = `
           <div class="flex-1 min-w-0">
             <strong class="block text-sm text-slate-900">${escapeHtml(cand.candidateName)}</strong>
-            <span class="text-[11px] text-slate-500">${escapeHtml(cand.candidateRole || '—')}${isFinalized ? ' · Finalized' : ''}</span>
+            <span class="text-[11px] text-slate-500">${escapeHtml(cand.candidateRole || '—')}${isFinalized ? ' · Finalized' : ''}${isActiveInterview ? ' · <span class="text-rose-600 font-semibold">Live now</span>' : ''}</span>
           </div>
           <span class="text-xs font-bold tabular-nums shrink-0">${avg != null ? `${avg}%` : submitted ? `${submitted} submitted` : '—'}</span>
           <div class="flex gap-1 shrink-0">
-            ${isFinalized ? '' : `<button type="button" class="btn-panel-pick-cand rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-bold text-indigo-800" data-id="${cand.id}">Score</button>`}
+            ${isFinalized ? '' : `<button type="button" class="btn-panel-pick-cand rounded-full ${isActiveInterview ? 'bg-rose-100 text-rose-800' : 'bg-indigo-100 text-indigo-800'} px-2.5 py-1 text-[10px] font-bold" data-id="${cand.id}">${isActiveInterview ? 'Join interview' : 'Score'}</button>`}
           </div>
         `;
-        li.querySelector('.btn-panel-pick-cand')?.addEventListener('click', () => selectPanelCandidate(cand.id));
+        li.querySelector('.btn-panel-pick-cand')?.addEventListener('click', async () => {
+          await pickPanelCandidateForInterview(cand.id);
+          await startPanelScorecardSession();
+        });
         panelHubCandidatesList.appendChild(li);
       });
     }
@@ -991,6 +1088,7 @@ const openPanelHub = async (panelId) => {
     const searchInput = document.getElementById('panel-candidate-search');
     if (searchInput) searchInput.value = '';
     subscribePanelCandidates(panelId);
+    subscribePanelDoc(panelId);
     renderPanelHubContent();
     openPanelModal('panel-hub-modal');
   } catch (err) {
@@ -1257,15 +1355,25 @@ const getFilteredPanelCandidates = () => {
   });
 };
 
-const renderImportPreviewModal = (rows, fileName) => {
+const renderImportPreviewModal = (rows, fileName, context = 'panel') => {
   const listEl = document.getElementById('panel-import-list');
   const subtitle = document.getElementById('panel-import-subtitle');
+  const helpEl = document.getElementById('import-modal-help');
   if (!listEl) return;
 
+  importModalContext = context;
   pendingImportRows = rows;
   if (subtitle) subtitle.textContent = `${rows.length} name${rows.length !== 1 ? 's' : ''} found in ${fileName}`;
+  if (helpEl) {
+    helpEl.textContent = context === 'solo'
+      ? 'Uncheck any rows you don’t want. Names already on your solo roster will be skipped.'
+      : 'Uncheck any rows you don’t want. Duplicates already in this panel will be skipped on import.';
+  }
 
-  const existingKeys = new Set(panelCandidates.map((c) => normalizeCandidateNameKey(c.candidateName)));
+  const existingKeys = context === 'solo'
+    ? new Set(soloRosterQueue.map((c) => normalizeCandidateNameKey(c.name)))
+    : new Set(panelCandidates.map((c) => normalizeCandidateNameKey(c.candidateName)));
+  const dupLabel = context === 'solo' ? 'Already on roster' : 'Already on panel';
 
   listEl.innerHTML = '';
   if (rows.length === 0) {
@@ -1279,7 +1387,7 @@ const renderImportPreviewModal = (rows, fileName) => {
         <input type="checkbox" class="panel-import-check" data-index="${index}" ${isDup ? '' : 'checked'} />
         <span class="panel-import-row__name">${escapeHtml(row.name)}</span>
         ${row.role ? `<span class="panel-import-row__role">${escapeHtml(row.role)}</span>` : ''}
-        ${isDup ? '<span class="text-[10px] text-amber-700 font-semibold">Already on panel</span>' : ''}
+        ${isDup ? `<span class="text-[10px] text-amber-700 font-semibold">${dupLabel}</span>` : ''}
       `;
       listEl.appendChild(div);
     });
@@ -1303,7 +1411,7 @@ const bulkImportSelectedCandidates = async (importSource) => {
     return;
   }
 
-  const btn = document.getElementById('btn-panel-import-confirm');
+  const btn = document.getElementById('btn-roster-import-confirm');
   if (btn) btn.disabled = true;
 
   let added = 0;
@@ -1352,7 +1460,275 @@ const handlePanelRosterImport = async (file) => {
     showToast('Reading file…', 'info');
     const rows = await parseRosterFile(file);
     pendingImportFileName = file.name;
-    renderImportPreviewModal(rows, file.name);
+    renderImportPreviewModal(rows, file.name, 'panel');
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || 'Could not read that file.', 'error');
+  }
+};
+
+// ── Solo interview roster (Excel / CSV / PDF) ──
+
+const getSoloRosterStorageKey = () => {
+  if (!currentWorkspace || !user || !activeInterviewTemplate?.id) return null;
+  return `tc-solo-roster:${currentWorkspace}:${user.uid}:${activeInterviewTemplate.id}`;
+};
+
+const loadSoloRoster = () => {
+  const key = getSoloRosterStorageKey();
+  if (!key) {
+    soloRosterQueue = [];
+    return;
+  }
+  try {
+    const raw = localStorage.getItem(key);
+    soloRosterQueue = raw ? JSON.parse(raw) : [];
+  } catch {
+    soloRosterQueue = [];
+  }
+};
+
+const saveSoloRoster = () => {
+  const key = getSoloRosterStorageKey();
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(soloRosterQueue));
+  } catch (_) { /* ignore */ }
+};
+
+const getFilteredSoloRoster = () => {
+  const q = soloRosterSearchQuery.trim().toLowerCase();
+  if (!q) return soloRosterQueue;
+  return soloRosterQueue.filter((c) => {
+    const name = (c.name || '').toLowerCase();
+    const role = (c.role || '').toLowerCase();
+    return name.includes(q) || role.includes(q);
+  });
+};
+
+const renderSoloRosterList = () => {
+  const listEl = document.getElementById('solo-roster-list');
+  const countEl = document.getElementById('solo-roster-count');
+  if (!listEl) return;
+
+  const filtered = getFilteredSoloRoster();
+  const doneCount = soloRosterQueue.filter((c) => c.status === 'done').length;
+
+  if (countEl) {
+    if (!soloRosterQueue.length) {
+      countEl.textContent = '';
+    } else if (soloRosterSearchQuery.trim()) {
+      countEl.textContent = `${filtered.length} of ${soloRosterQueue.length} shown`;
+    } else {
+      countEl.textContent = `${doneCount}/${soloRosterQueue.length} done`;
+    }
+  }
+
+  listEl.innerHTML = '';
+  if (!soloRosterQueue.length) {
+    listEl.innerHTML = '<li class="text-xs text-slate-500 py-2">No roster yet — upload Excel, CSV, or PDF above.</li>';
+    return;
+  }
+  if (!filtered.length) {
+    listEl.innerHTML = '<li class="text-xs text-slate-500 py-2">No candidates match your search.</li>';
+    return;
+  }
+
+  filtered.forEach((entry) => {
+    const index = soloRosterQueue.indexOf(entry);
+    const li = document.createElement('li');
+    const isCurrent = entry.status === 'current';
+    const isDone = entry.status === 'done';
+    li.className = `panel-scorecard-item ${isCurrent ? 'ring-2 ring-indigo-400 bg-indigo-50/60' : ''} ${isDone ? 'opacity-60' : ''}`;
+    li.innerHTML = `
+      <div class="flex-1 min-w-0">
+        <strong class="block text-sm text-slate-900">${escapeHtml(entry.name)}</strong>
+        <span class="text-[11px] text-slate-500">${escapeHtml(entry.role || '—')}${isDone ? ' · Done' : isCurrent ? ' · <span class="text-indigo-600 font-semibold">Current</span>' : ''}</span>
+      </div>
+      ${isDone ? '' : `<button type="button" class="btn-solo-pick-cand rounded-full ${isCurrent ? 'bg-indigo-200 text-indigo-900' : 'bg-indigo-100 text-indigo-800'} px-2.5 py-1 text-[10px] font-bold">${isCurrent ? 'Selected' : 'Select'}</button>`}
+    `;
+    li.querySelector('.btn-solo-pick-cand')?.addEventListener('click', () => {
+      selectSoloRosterCandidate(index);
+    });
+    listEl.appendChild(li);
+  });
+};
+
+const setSoloRosterUIVisible = (visible) => {
+  const section = document.getElementById('solo-roster-section');
+  if (!section || isPanelModeActive()) {
+    section?.classList.add('hidden');
+    return;
+  }
+  section.classList.toggle('hidden', !visible);
+  if (visible) renderSoloRosterList();
+};
+
+const hasLiveInterviewProgress = () => {
+  if (!activeInterviewTemplate) return false;
+  const hasScores = Object.values(candidateScores || {}).some(Boolean);
+  const hasLikerts = Object.values(likertResponses || {}).some(Boolean);
+  const hasNotes = document.getElementById('candidate-strengths')?.value?.trim()
+    || document.getElementById('candidate-weaknesses')?.value?.trim()
+    || document.getElementById('overall-feedback')?.value?.trim();
+  return hasScores || hasLikerts || Boolean(hasNotes) || interviewDuration > 0;
+};
+
+const resetLiveFormForNewCandidate = (name, role) => {
+  if (!activeInterviewTemplate) return;
+
+  document.getElementById('candidate-name').value = name;
+  document.getElementById('candidate-role').value = role || activeInterviewTemplate.role || '';
+  document.getElementById('candidate-strengths').value = '';
+  document.getElementById('candidate-weaknesses').value = '';
+  document.getElementById('overall-feedback').value = '';
+
+  candidateScores = {};
+  candidateNotes = {};
+  likertResponses = {};
+  activeInterviewTemplate.criteria.forEach((c) => {
+    candidateNotes[c.id] = '';
+  });
+
+  interviewDuration = 0;
+  clearInterval(timerInterval);
+  updateLiveTimerDisplay(0);
+  timerInterval = setInterval(() => {
+    interviewDuration++;
+    updateLiveTimerDisplay(interviewDuration);
+    if (interviewDuration % 30 === 0) scheduleDraftSave();
+  }, 1000);
+
+  navActiveCandidateName.textContent = name;
+  renderLiveInterviewSheet();
+  scheduleDraftSave();
+};
+
+const selectSoloRosterCandidate = (index, { force = false } = {}) => {
+  const entry = soloRosterQueue[index];
+  if (!entry || entry.status === 'done') return;
+
+  if (!force && hasLiveInterviewProgress()) {
+    const currentName = document.getElementById('candidate-name')?.value?.trim();
+    if (currentName && normalizeCandidateNameKey(currentName) !== normalizeCandidateNameKey(entry.name)) {
+      if (!window.confirm(`Switch to ${entry.name}? Unsaved ratings for the current candidate will be cleared.`)) return;
+    }
+  }
+
+  soloRosterQueue.forEach((c, i) => {
+    if (i === index) c.status = 'current';
+    else if (c.status === 'current') c.status = 'pending';
+  });
+
+  saveSoloRoster();
+  resetLiveFormForNewCandidate(entry.name, entry.role);
+  renderSoloRosterList();
+};
+
+const syncSoloRosterCurrentFromName = (name) => {
+  const key = normalizeCandidateNameKey(name);
+  if (!key || !soloRosterQueue.length) return;
+
+  let matched = false;
+  soloRosterQueue.forEach((c) => {
+    if (normalizeCandidateNameKey(c.name) === key && c.status !== 'done') {
+      c.status = 'current';
+      matched = true;
+    } else if (c.status === 'current') {
+      c.status = 'pending';
+    }
+  });
+
+  if (matched) {
+    saveSoloRoster();
+    renderSoloRosterList();
+  }
+};
+
+const markSoloRosterCandidateDone = (candidateName) => {
+  const key = normalizeCandidateNameKey(candidateName);
+  if (!key) return;
+
+  soloRosterQueue.forEach((c) => {
+    if (normalizeCandidateNameKey(c.name) === key) c.status = 'done';
+    else if (c.status === 'current') c.status = 'pending';
+  });
+  saveSoloRoster();
+  renderSoloRosterList();
+};
+
+const bulkImportSoloRoster = async (importSource) => {
+  if (!activeInterviewTemplate || !user) {
+    showToast('Start a solo interview first.', 'error');
+    return;
+  }
+
+  const checks = document.querySelectorAll('.panel-import-check:checked');
+  const selected = [];
+  checks.forEach((el) => {
+    const idx = Number(el.getAttribute('data-index'));
+    if (pendingImportRows[idx]) selected.push(pendingImportRows[idx]);
+  });
+
+  if (selected.length === 0) {
+    showToast('Select at least one candidate to import.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-roster-import-confirm');
+  if (btn) btn.disabled = true;
+
+  let added = 0;
+  let skipped = 0;
+  const existingKeys = new Set(soloRosterQueue.map((c) => normalizeCandidateNameKey(c.name)));
+
+  try {
+    for (const row of selected) {
+      const key = normalizeCandidateNameKey(row.name);
+      if (existingKeys.has(key)) {
+        skipped++;
+        continue;
+      }
+      soloRosterQueue.push({
+        name: row.name,
+        role: row.role || '',
+        status: 'pending',
+        importSource
+      });
+      existingKeys.add(key);
+      added++;
+    }
+
+    saveSoloRoster();
+    closePanelModal('panel-import-modal');
+    pendingImportRows = [];
+    renderSoloRosterList();
+    setSoloRosterUIVisible(true);
+    showToast(`Added ${added} candidate${added !== 1 ? 's' : ''} to roster${skipped ? ` (${skipped} skipped as duplicates)` : ''}.`, 'success');
+
+    const firstNew = soloRosterQueue.find((c) => c.status === 'pending');
+    if (firstNew && !document.getElementById('candidate-name')?.value?.trim()) {
+      selectSoloRosterCandidate(soloRosterQueue.indexOf(firstNew), { force: true });
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Import failed. Please try again.', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+const handleSoloRosterImport = async (file) => {
+  if (!activeInterviewTemplate) {
+    showToast('Start a solo interview first.', 'error');
+    return;
+  }
+
+  try {
+    showToast('Reading file…', 'info');
+    const rows = await parseRosterFile(file);
+    pendingImportFileName = file.name;
+    renderImportPreviewModal(rows, file.name, 'solo');
   } catch (err) {
     console.error(err);
     showToast(err.message || 'Could not read that file.', 'error');
@@ -1413,12 +1789,26 @@ const joinPanelByCode = async (rawCode) => {
     activePanel = { id: panelDoc.id, ...panelDoc.data() };
     activePanelCandidateId = null;
     activePanelCandidate = null;
+    panelJoinAutoEnter = true;
+
     subscribePanelCandidates(panelDoc.id);
+    subscribePanelDoc(panelDoc.id);
+
+    const candsSnap = await getDocs(panelCandidatesCollectionRef(panelDoc.id));
+    panelCandidates = candsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
     closePanelModal('panel-join-modal');
     panelJoinError?.classList.add('hidden');
-    openPanelModal('panel-hub-modal');
-    renderPanelHubContent();
-    showToast('Joined panel for this rubric.', 'success');
+
+    const entered = await tryEnterActivePanelInterview();
+    if (!entered) {
+      panelJoinAutoEnter = false;
+      openPanelModal('panel-hub-modal');
+      renderPanelHubContent();
+      showToast('Joined panel. Waiting for a live interview — or pick a candidate and tap Score.', 'info');
+    } else {
+      showToast(`You're in — scoring ${activePanelCandidate?.candidateName || 'candidate'}.`, 'success');
+    }
     return panelDoc.id;
   } catch (err) {
     console.error(err);
@@ -1443,16 +1833,19 @@ const loadScorecardIntoLiveForm = (card) => {
   interviewDuration = card?.durationSeconds || 0;
 };
 
-const startPanelScorecardSession = async () => {
+const startPanelScorecardSession = async (options = {}) => {
+  const { silent = false } = options;
   if (!activePanelId || !activePanel || !activePanelCandidateId || !activePanelCandidate || !user) {
-    showToast('Select a candidate in the panel first.', 'error');
-    return;
+    if (!silent) showToast('Select a candidate in the panel first.', 'error');
+    return false;
   }
 
   if (activePanelCandidate.status === 'finalized') {
-    showToast('This candidate is finalized. No more scorecards can be submitted.', 'error');
-    return;
+    if (!silent) showToast('This candidate is finalized. No more scorecards can be submitted.', 'error');
+    return false;
   }
+
+  await setPanelActiveCandidate(activePanelCandidateId);
 
   const tpl = activePanel.templateSnapshot;
   activeInterviewTemplate = {
@@ -1471,8 +1864,10 @@ const startPanelScorecardSession = async () => {
     console.error(err);
   }
 
-  if (cardData?.status === 'submitted') {
-    if (!window.confirm('You already submitted a scorecard. Open again to edit and resubmit?')) return;
+  if (cardData?.status === 'submitted' && !silent) {
+    if (!window.confirm('You already submitted a scorecard. Open again to edit and resubmit?')) return false;
+  } else if (cardData?.status === 'submitted' && silent) {
+    return false;
   }
 
   loadScorecardIntoLiveForm(cardData);
@@ -1500,12 +1895,14 @@ const startPanelScorecardSession = async () => {
   navActiveCandidateName.textContent = activePanelCandidate.candidateName;
   navActiveAssessmentContainer.classList.remove('hidden');
   setLiveInterviewPanelUI(true);
+  setSoloRosterUIVisible(false);
   if (panelLiveCode) panelLiveCode.textContent = activePanel.joinCode;
   updatePanelLiveBanner();
   renderLiveInterviewSheet();
   bindLiveInterviewAutosave();
   closePanelModal('panel-hub-modal');
   switchTab('live-interview');
+  return true;
 };
 
 const updatePanelLiveBanner = () => {
@@ -1656,6 +2053,10 @@ const finalizePanelEvaluation = async () => {
       finalizedAt: new Date().toISOString(),
       finalizedBy: user.uid
     });
+    if (activePanel?.activeCandidateId === activePanelCandidateId) {
+      await updateDoc(panelDocRef(activePanelId), { activeCandidateId: null });
+      activePanel.activeCandidateId = null;
+    }
     activePanelCandidate.status = 'finalized';
     showToast(`Finalized ${data.candidateName} — ${compiled.compiledScore}% (avg of ${compiled.scorecardCount} scorecards)`);
     activePanelCandidateId = null;
@@ -1696,8 +2097,23 @@ document.getElementById('panel-import-file')?.addEventListener('change', async (
   if (file) await handlePanelRosterImport(file);
 });
 
-document.getElementById('btn-panel-import-confirm')?.addEventListener('click', async () => {
-  await bulkImportSelectedCandidates(pendingImportFileName || 'roster-import');
+document.getElementById('solo-import-file')?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (file) await handleSoloRosterImport(file);
+});
+
+document.getElementById('solo-roster-search')?.addEventListener('input', (e) => {
+  soloRosterSearchQuery = e.target.value;
+  renderSoloRosterList();
+});
+
+document.getElementById('btn-roster-import-confirm')?.addEventListener('click', async () => {
+  if (importModalContext === 'solo') {
+    await bulkImportSoloRoster(pendingImportFileName || 'roster-import');
+  } else {
+    await bulkImportSelectedCandidates(pendingImportFileName || 'roster-import');
+  }
 });
 
 panelJoinForm?.addEventListener('submit', async (e) => {
@@ -2338,6 +2754,9 @@ const restoreInterviewFromDraft = (draft) => {
 
   navActiveCandidateName.textContent = draft.candidateName?.trim() || 'Draft interview';
   navActiveAssessmentContainer.classList.remove('hidden');
+  loadSoloRoster();
+  setSoloRosterUIVisible(true);
+  if (draft.candidateName?.trim()) syncSoloRosterCurrentFromName(draft.candidateName.trim());
   renderLiveInterviewSheet();
   bindLiveInterviewAutosave();
   switchTab('live-interview');
@@ -3324,9 +3743,10 @@ const handleStartInterview = (template) => {
   activePanel = null;
   activePanelCandidateId = null;
   activePanelCandidate = null;
-  setLiveInterviewPanelUI(false);
 
   activeInterviewTemplate = template;
+  setLiveInterviewPanelUI(false);
+
   document.getElementById('candidate-name').value = '';
   document.getElementById('candidate-role').value = template.role || '';
   document.getElementById('interviewer-name').value = '';
@@ -3354,7 +3774,14 @@ const handleStartInterview = (template) => {
 
   navActiveCandidateName.textContent = 'New interview';
   navActiveAssessmentContainer.classList.remove('hidden');
-  renderLiveInterviewSheet();
+  loadSoloRoster();
+  setSoloRosterUIVisible(true);
+  const rosterPick = soloRosterQueue.find((c) => c.status === 'current') || soloRosterQueue.find((c) => c.status === 'pending');
+  if (rosterPick) {
+    selectSoloRosterCandidate(soloRosterQueue.indexOf(rosterPick), { force: true });
+  } else {
+    renderLiveInterviewSheet();
+  }
   bindLiveInterviewAutosave();
   switchTab('live-interview');
 };
@@ -3365,7 +3792,9 @@ const updateLiveTimerDisplay = (seconds) => {
 };
 
 document.getElementById('candidate-name').addEventListener('input', (event) => {
-  navActiveCandidateName.textContent = event.target.value.trim() || 'New interview';
+  const name = event.target.value.trim();
+  navActiveCandidateName.textContent = name || 'New interview';
+  if (!isPanelModeActive()) syncSoloRosterCurrentFromName(name);
 });
 
 document.getElementById('btn-cancel-interview').addEventListener('click', async () => {
@@ -3390,6 +3819,7 @@ const cleanupActiveInterview = (silent = false, keepPanelSession = false) => {
   interviewDuration = 0;
   navActiveAssessmentContainer.classList.add('hidden');
   setLiveInterviewPanelUI(false);
+  setSoloRosterUIVisible(false);
   if (!keepPanelSession) {
     activePanelId = null;
     activePanel = null;
@@ -3409,11 +3839,14 @@ document.getElementById('live-interview-form').addEventListener('submit', async 
     return;
   }
 
-  const candidateName = document.getElementById('candidate-name').value.trim();
-  if (!candidateName) {
-    showToast('Please enter the candidate\'s name before saving.', 'error');
-    document.getElementById('candidate-name').focus();
-    return;
+  let candidateName = '';
+  if (!isPanelModeActive()) {
+    candidateName = document.getElementById('candidate-name').value.trim();
+    if (!candidateName) {
+      showToast('Please enter the candidate\'s name before saving.', 'error');
+      document.getElementById('candidate-name').focus();
+      return;
+    }
   }
 
   const unratedCriteria = activeInterviewTemplate.criteria.filter(c => !candidateScores[c.id]);
@@ -3465,6 +3898,16 @@ document.getElementById('live-interview-form').addEventListener('submit', async 
     const candidatesCollection = collection(db, 'artifacts', app_id, 'workspaces', currentWorkspace, 'candidates');
     await addDoc(candidatesCollection, candidateData);
     await clearInterviewDraft();
+    markSoloRosterCandidateDone(candidateName);
+
+    const nextPending = soloRosterQueue.find((c) => c.status === 'pending');
+    if (nextPending && window.confirm(`${candidateData.name} saved — ${calculatedScore}%. Continue with ${nextPending.name}?`)) {
+      showToast(`${candidateData.name} saved — score ${calculatedScore}%`, 'success');
+      selectSoloRosterCandidate(soloRosterQueue.indexOf(nextPending), { force: true });
+      switchTab('live-interview');
+      return;
+    }
+
     showToast(`${candidateData.name} saved — score ${calculatedScore}%`);
     cleanupActiveInterview();
     switchTab('class-analytics');
