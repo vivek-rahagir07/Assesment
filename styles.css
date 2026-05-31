@@ -151,6 +151,10 @@ button {
   animation: loginEntrance 0.85s var(--ease-out-expo) both;
 }
 
+.login-card-grid.ui-border-trace {
+  overflow: visible;
+}
+
 .login-card-grid.is-exiting {
   animation: loginExit 0.5s var(--ease-out-expo) forwards;
 }
@@ -247,123 +251,96 @@ button {
   letter-spacing: 0.01em;
 }
 
-/* Hero word typewriter (brand panel) */
-.login-hero-typewriter {
+/* Workspace welcome typewriter */
+.ws-typewriter-line {
   display: flex;
+  align-items: baseline;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.5rem;
-  margin-top: 0.75rem;
-  max-width: 20rem;
-  min-height: 2.75rem;
-  line-height: 1.2;
+  gap: 0;
+  margin-top: 0.35rem;
+  margin-bottom: 0.25rem;
+  min-height: 2rem;
 }
 
-.login-hero-typewriter__prefix {
-  font-size: 1rem;
-  font-weight: 500;
-  color: rgba(199, 210, 254, 0.88);
-  letter-spacing: 0.02em;
-}
-
-@media (min-width: 640px) {
-  .login-hero-typewriter__prefix {
-    font-size: 1.0625rem;
-  }
-}
-
-.login-word-typewriter {
-  display: inline-flex;
-  align-items: baseline;
-  min-width: 6ch;
-}
-
-.login-word-typewriter__word {
-  font-size: 1.5rem;
-  font-weight: 800;
+.ws-typewriter-word {
+  font-size: 1.25rem;
+  font-weight: 700;
   letter-spacing: -0.02em;
-  color: #fff;
-  text-shadow: 0 2px 24px rgba(129, 140, 248, 0.45);
+  color: #4f46e5;
+  line-height: 1.3;
 }
 
 @media (min-width: 640px) {
-  .login-word-typewriter__word {
-    font-size: 1.75rem;
+  .ws-typewriter-word {
+    font-size: 1.5rem;
   }
 }
 
-.login-word-typewriter__cursor {
+.ws-typewriter-cursor {
   display: inline-block;
-  margin-left: 2px;
-  font-size: 1.5rem;
-  font-weight: 300;
-  color: rgba(199, 210, 254, 0.95);
-  animation: typewriterCursorBlink 0.9s step-end infinite;
+  width: 2px;
+  height: 1.15em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: #6366f1;
+  animation: wsCursorBlink 0.85s step-end infinite;
 }
 
-@media (min-width: 640px) {
-  .login-word-typewriter__cursor {
-    font-size: 1.75rem;
-  }
-}
-
-@keyframes typewriterCursorBlink {
+@keyframes wsCursorBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
 
-/* Animated glow border around workspace entry */
-.workspace-entry-glow {
+/* Marching highlight line around login card + workspace panel */
+.svg-defs-hidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.ui-border-trace {
   position: relative;
-  border-radius: 1.35rem;
-  padding: 2px;
-  background: transparent;
-  box-shadow:
-    0 0 20px rgba(99, 102, 241, 0.12),
-    0 12px 40px rgba(99, 102, 241, 0.08);
+  isolation: isolate;
 }
 
-.workspace-entry-glow::before {
-  content: '';
+.ui-border-trace > .ui-border-trace__svg {
   position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg,
-    transparent 70deg,
-    #818cf8 120deg,
-    #c4b5fd 180deg,
-    #6366f1 240deg,
-    #a5b4fc 300deg,
-    transparent 360deg
-  );
-  animation: workspaceGlowSpin 3.5s linear infinite;
-  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
   pointer-events: none;
+  overflow: visible;
 }
 
-.workspace-entry-glow::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border-radius: calc(1.35rem - 2px);
-  background: var(--bg-surface, #fff);
-  z-index: 0;
-  pointer-events: none;
+.ui-border-trace__rect {
+  fill: none;
+  stroke: url(#borderTraceGradient);
+  stroke-width: 0.55;
+  stroke-linecap: round;
+  stroke-dasharray: 12 88;
+  animation: uiBorderTraceMarch 4s linear infinite;
 }
 
-.workspace-entry-glow > * {
+.ui-border-trace--inner {
+  border-radius: 1.25rem;
+  margin: 0.25rem;
+}
+
+.ui-border-trace--inner > .ui-border-trace__rect {
+  stroke-width: 0.65;
+  stroke-dasharray: 10 90;
+  animation-duration: 3.2s;
+}
+
+.ui-border-trace__content {
   position: relative;
   z-index: 1;
 }
 
-@keyframes workspaceGlowSpin {
-  to { transform: rotate(360deg); }
-}
-
-.workspace-entry-glow.pulse-panel::before {
-  animation-duration: 2s;
+@keyframes uiBorderTraceMarch {
+  to { stroke-dashoffset: -100; }
 }
 
 .animate-brand-logo {
@@ -519,6 +496,7 @@ button {
   flex-direction: column;
   justify-content: center;
   background: var(--bg-surface);
+  overflow: visible;
 }
 
 .login-shell.is-authenticated .login-panel {
@@ -1775,14 +1753,14 @@ select:focus-visible {
   .animate-brand-logo,
   .animate-in,
   .animate-pulse,
-  .workspace-entry-glow::before,
-  .login-word-typewriter__cursor {
+  .ui-border-trace__rect,
+  .ws-typewriter-cursor {
     animation: none !important;
   }
 
-  .workspace-entry-glow::before {
-    background: linear-gradient(135deg, #818cf8, #c4b5fd, #6366f1);
-    opacity: 0.85;
+  .ui-border-trace__rect {
+    stroke-dasharray: none;
+    stroke-opacity: 0.45;
   }
 
   * {

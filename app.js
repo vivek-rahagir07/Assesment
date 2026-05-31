@@ -86,7 +86,7 @@ const btnWsSubmitText = document.getElementById('btn-ws-submit-text');
 const loginAuthPill = document.getElementById('login-auth-pill');
 const loginAuthLabel = document.getElementById('login-auth-label');
 const loginGreeting = document.getElementById('login-greeting');
-const loginTypewriterWord = document.getElementById('login-typewriter-word');
+const wsTypewriterWord = document.getElementById('ws-typewriter-word');
 const loginSuccessOverlay = document.getElementById('login-success-overlay');
 const loginSuccessMsg = document.getElementById('login-success-msg');
 const headerWsBadge = document.getElementById('header-ws-badge');
@@ -282,66 +282,71 @@ navFormBuilder.addEventListener('click', () => {
 navClassAnalytics.addEventListener('click', () => switchTab('class-analytics'));
 navLiveInterview.addEventListener('click', () => switchTab('live-interview'));
 
-const LOGIN_TYPEWRITER_WORDS = [
-  'fair scores',
-  'clear feedback',
-  'better hires',
-  'live calibration',
-  'panel alignment',
-  'smarter decisions'
+const WS_TYPEWRITER_WORDS = [
+  'Fair scores',
+  'Clear feedback',
+  'Better hires',
+  'Live calibration',
+  'Panel alignment'
 ];
 
-let typewriterWordIndex = 0;
-let typewriterAnimating = false;
+let wsTypewriterIndex = 0;
+let wsTypewriterRunning = false;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const typeWordInto = async (element, text, speed = 55) => {
-  element.textContent = '';
+const formatWsTypewriterPhrase = (phrase) => phrase;
+
+const typePhraseIn = async (el, text, speed = 42) => {
+  el.textContent = '';
   for (let i = 0; i < text.length; i++) {
-    element.textContent += text.charAt(i);
+    el.textContent += text.charAt(i);
     await sleep(speed);
   }
 };
 
-const deleteWordFrom = async (element, speed = 32) => {
-  let current = element.textContent;
-  while (current.length > 0) {
-    current = current.slice(0, -1);
-    element.textContent = current;
+const typePhraseOut = async (el, speed = 28) => {
+  let text = el.textContent;
+  while (text.length > 0) {
+    text = text.slice(0, -1);
+    el.textContent = text;
     await sleep(speed);
   }
 };
 
-const initLoginWordTypewriter = () => {
-  if (!loginTypewriterWord) return;
+const initWsTypewriter = () => {
+  if (!wsTypewriterWord || wsTypewriterRunning) return;
 
-  if (isMobileDevice() || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    loginTypewriterWord.textContent = LOGIN_TYPEWRITER_WORDS[0].replace(/\b\w/g, (c) => c.toUpperCase());
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reducedMotion) {
+    wsTypewriterWord.textContent = WS_TYPEWRITER_WORDS[0];
     return;
   }
 
-  const playWordCycle = async () => {
-    if (typewriterAnimating) return;
-    typewriterAnimating = true;
+  wsTypewriterRunning = true;
 
+  const run = async () => {
+    await sleep(400);
     while (true) {
-      const word = LOGIN_TYPEWRITER_WORDS[typewriterWordIndex]
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      await typeWordInto(loginTypewriterWord, word);
-      await sleep(2200);
-      await deleteWordFrom(loginTypewriterWord);
-      await sleep(280);
-      typewriterWordIndex = (typewriterWordIndex + 1) % LOGIN_TYPEWRITER_WORDS.length;
+      if (landingStep?.classList.contains('hidden')) {
+        await sleep(400);
+        continue;
+      }
+      const phrase = formatWsTypewriterPhrase(WS_TYPEWRITER_WORDS[wsTypewriterIndex]);
+      await typePhraseIn(wsTypewriterWord, phrase);
+      await sleep(2400);
+      await typePhraseOut(wsTypewriterWord);
+      await sleep(350);
+      wsTypewriterIndex = (wsTypewriterIndex + 1) % WS_TYPEWRITER_WORDS.length;
     }
   };
 
-  loginTypewriterWord.textContent = '';
-  setTimeout(playWordCycle, 600);
+  wsTypewriterWord.textContent = '';
+  run();
 };
 
 const initLoginUX = () => {
-  initLoginWordTypewriter();
+  initWsTypewriter();
 
   wsNameInput?.addEventListener('input', () => {
     const wrap = wsNameInput.closest('.field-input-wrap');
@@ -468,7 +473,11 @@ if (btnModeEnter) btnModeEnter.addEventListener('click', () => showFormStep('ent
 if (btnModeCreate) btnModeCreate.addEventListener('click', () => showFormStep('create'));
 if (btnBackToLanding) btnBackToLanding.addEventListener('click', showLandingStep);
 
-initLoginUX();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initLoginUX);
+} else {
+  initLoginUX();
+}
 
 workspaceForm.addEventListener('submit', async (event) => {
   event.preventDefault();
