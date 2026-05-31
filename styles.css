@@ -170,12 +170,7 @@ button {
 }
 
 .login-shell.is-authenticated .login-card-grid {
-  display: block;
-  border: none;
-  box-shadow: none;
-  background: transparent;
-  border-radius: 0;
-  overflow: visible;
+  display: none !important;
 }
 
 @media (min-width: 1024px) {
