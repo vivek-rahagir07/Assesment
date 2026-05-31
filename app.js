@@ -4172,22 +4172,27 @@ if ('serviceWorker' in navigator) {
 
 // 2. Custom A2HS (Add to Home Screen) Install Prompt
 let deferredPrompt;
-const btnInstallPwa = document.getElementById('btn-install-pwa');
+const btnInstallPwas = document.querySelectorAll('.btn-install-pwa');
 
 window.addEventListener('beforeinstallprompt', (e) => {
   // Prevent the mini-infobar from appearing on mobile
   e.preventDefault();
   // Stash the event so it can be triggered later.
   deferredPrompt = e;
-  // Update UI notify the user they can install the PWA
-  if (btnInstallPwa) {
-    btnInstallPwa.classList.remove('hidden');
-    btnInstallPwa.classList.add('inline-flex');
-  }
+  // Update UI to notify the user they can install the PWA
+  btnInstallPwas.forEach(btn => {
+    btn.classList.remove('hidden');
+    // Ensure display styles match properly
+    if (btn.id === 'btn-install-pwa') {
+      btn.classList.add('inline-flex');
+    } else {
+      btn.classList.add('flex');
+    }
+  });
 });
 
-if (btnInstallPwa) {
-  btnInstallPwa.addEventListener('click', async () => {
+btnInstallPwas.forEach(btn => {
+  btn.addEventListener('click', async () => {
     if (!deferredPrompt) return;
     // Show the install prompt
     deferredPrompt.prompt();
@@ -4196,18 +4201,20 @@ if (btnInstallPwa) {
     console.log(`PWA install prompt response: ${outcome}`);
     // We've used the prompt, and can't use it again
     deferredPrompt = null;
-    // Hide the install button
-    btnInstallPwa.classList.add('hidden');
-    btnInstallPwa.classList.remove('inline-flex');
+    // Hide all install buttons
+    btnInstallPwas.forEach(b => {
+      b.classList.add('hidden');
+      b.classList.remove('inline-flex', 'flex');
+    });
   });
-}
+});
 
 window.addEventListener('appinstalled', (evt) => {
   console.log('TalentCalibrate PWA was installed successfully!');
-  if (btnInstallPwa) {
-    btnInstallPwa.classList.add('hidden');
-    btnInstallPwa.classList.remove('inline-flex');
-  }
+  btnInstallPwas.forEach(b => {
+    b.classList.add('hidden');
+    b.classList.remove('inline-flex', 'flex');
+  });
 });
 
 // 3. Online/Offline Toast Notifications
