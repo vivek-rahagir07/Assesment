@@ -283,11 +283,10 @@ navClassAnalytics.addEventListener('click', () => switchTab('class-analytics'));
 navLiveInterview.addEventListener('click', () => switchTab('live-interview'));
 
 const WS_TYPEWRITER_WORDS = [
-  'Fair scores',
-  'Clear feedback',
-  'Better hires',
-  'Live calibration',
-  'Panel alignment'
+  'Precision grading',
+  'Unbiased decisions',
+  'Talent intelligence',
+  'Perfect calibration'
 ];
 
 let wsTypewriterIndex = 0;
