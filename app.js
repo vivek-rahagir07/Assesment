@@ -328,8 +328,8 @@ const initWsTypewriter = () => {
   const run = async () => {
     await sleep(400);
     while (true) {
-      if (landingStep?.classList.contains('hidden')) {
-        await sleep(400);
+      if (currentWorkspace) {
+        await sleep(1000);
         continue;
       }
       const phrase = formatWsTypewriterPhrase(WS_TYPEWRITER_WORDS[wsTypewriterIndex]);

@@ -257,17 +257,18 @@ button {
   align-items: baseline;
   flex-wrap: wrap;
   gap: 0;
-  margin-top: 0.35rem;
+  margin-top: 1rem;
   margin-bottom: 0.25rem;
-  min-height: 2rem;
+  min-height: 2.2rem;
 }
 
 .ws-typewriter-word {
   font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #4f46e5;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #38bdf8; /* vibrant neon sky blue */
   line-height: 1.3;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.8), 0 0 20px rgba(56, 189, 248, 0.4);
 }
 
 @media (min-width: 640px) {
@@ -280,9 +281,10 @@ button {
   display: inline-block;
   width: 2px;
   height: 1.15em;
-  margin-left: 3px;
+  margin-left: 4px;
   vertical-align: text-bottom;
-  background: #6366f1;
+  background: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.9);
   animation: wsCursorBlink 0.85s step-end infinite;
 }
 
@@ -317,21 +319,11 @@ button {
 .ui-border-trace__rect {
   fill: none;
   stroke: url(#borderTraceGradient);
-  stroke-width: 0.55;
+  stroke-width: 0.85;
   stroke-linecap: round;
-  stroke-dasharray: 12 88;
-  animation: uiBorderTraceMarch 4s linear infinite;
-}
-
-.ui-border-trace--inner {
-  border-radius: 1.25rem;
-  margin: 0.25rem;
-}
-
-.ui-border-trace--inner > .ui-border-trace__rect {
-  stroke-width: 0.65;
-  stroke-dasharray: 10 90;
-  animation-duration: 3.2s;
+  stroke-dasharray: 15 85;
+  animation: uiBorderTraceMarch 3.5s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(129, 140, 248, 0.8)) drop-shadow(0 0 10px rgba(167, 139, 250, 0.5));
 }
 
 .ui-border-trace__content {
