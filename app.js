@@ -86,7 +86,7 @@ const btnWsSubmitText = document.getElementById('btn-ws-submit-text');
 const loginAuthPill = document.getElementById('login-auth-pill');
 const loginAuthLabel = document.getElementById('login-auth-label');
 const loginGreeting = document.getElementById('login-greeting');
-const loginTagline = document.getElementById('login-tagline');
+const loginTypewriterWord = document.getElementById('login-typewriter-word');
 const loginSuccessOverlay = document.getElementById('login-success-overlay');
 const loginSuccessMsg = document.getElementById('login-success-msg');
 const headerWsBadge = document.getElementById('header-ws-badge');
@@ -282,55 +282,66 @@ navFormBuilder.addEventListener('click', () => {
 navClassAnalytics.addEventListener('click', () => switchTab('class-analytics'));
 navLiveInterview.addEventListener('click', () => switchTab('live-interview'));
 
-const LOGIN_TAGLINES = [
-  'Where great hiring decisions start — together.',
-  'Fair scores. Clear feedback. Better hires.',
-  'Your team\'s calibration hub, ready when you are.',
-  'Less guesswork, more confidence in every interview.'
+const LOGIN_TYPEWRITER_WORDS = [
+  'fair scores',
+  'clear feedback',
+  'better hires',
+  'live calibration',
+  'panel alignment',
+  'smarter decisions'
 ];
 
-let taglineIndex = 0;
+let typewriterWordIndex = 0;
+let typewriterAnimating = false;
 
-const typeWriterEffect = async (element, text, speed = 40) => {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const typeWordInto = async (element, text, speed = 55) => {
   element.textContent = '';
   for (let i = 0; i < text.length; i++) {
     element.textContent += text.charAt(i);
-    await new Promise(r => setTimeout(r, speed));
+    await sleep(speed);
   }
 };
 
-const initLoginUX = () => {
-  if (loginTagline) {
-    if (isMobileDevice()) {
-      loginTagline.textContent = LOGIN_TAGLINES[0];
-    } else {
-      loginTagline.style.borderRight = '2px solid rgba(199, 210, 254, 0.8)';
-      loginTagline.style.paddingRight = '4px';
-
-      setInterval(() => {
-        loginTagline.style.borderColor = loginTagline.style.borderColor === 'transparent' ? 'rgba(199, 210, 254, 0.8)' : 'transparent';
-      }, 500);
-
-      const playTaglineSequence = async () => {
-        while (true) {
-          await typeWriterEffect(loginTagline, LOGIN_TAGLINES[taglineIndex]);
-          await new Promise(r => setTimeout(r, 4000));
-
-          let currentText = loginTagline.textContent;
-          while (currentText.length > 0) {
-            currentText = currentText.slice(0, -1);
-            loginTagline.textContent = currentText;
-            await new Promise(r => setTimeout(r, 20));
-          }
-
-          taglineIndex = (taglineIndex + 1) % LOGIN_TAGLINES.length;
-          await new Promise(r => setTimeout(r, 500));
-        }
-      };
-
-      setTimeout(playTaglineSequence, 800);
-    }
+const deleteWordFrom = async (element, speed = 32) => {
+  let current = element.textContent;
+  while (current.length > 0) {
+    current = current.slice(0, -1);
+    element.textContent = current;
+    await sleep(speed);
   }
+};
+
+const initLoginWordTypewriter = () => {
+  if (!loginTypewriterWord) return;
+
+  if (isMobileDevice() || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    loginTypewriterWord.textContent = LOGIN_TYPEWRITER_WORDS[0].replace(/\b\w/g, (c) => c.toUpperCase());
+    return;
+  }
+
+  const playWordCycle = async () => {
+    if (typewriterAnimating) return;
+    typewriterAnimating = true;
+
+    while (true) {
+      const word = LOGIN_TYPEWRITER_WORDS[typewriterWordIndex]
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      await typeWordInto(loginTypewriterWord, word);
+      await sleep(2200);
+      await deleteWordFrom(loginTypewriterWord);
+      await sleep(280);
+      typewriterWordIndex = (typewriterWordIndex + 1) % LOGIN_TYPEWRITER_WORDS.length;
+    }
+  };
+
+  loginTypewriterWord.textContent = '';
+  setTimeout(playWordCycle, 600);
+};
+
+const initLoginUX = () => {
+  initLoginWordTypewriter();
 
   wsNameInput?.addEventListener('input', () => {
     const wrap = wsNameInput.closest('.field-input-wrap');
