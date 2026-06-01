@@ -11,6 +11,29 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="stylesheet" href="styles.css" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => {
+            console.log('ServiceWorker registration successful with scope: ', reg.scope);
+            
+            // Listen for service worker updates
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.dispatchEvent(new CustomEvent('sw-update-available', { detail: reg }));
+                }
+              });
+            });
+          })
+          .catch((err) => {
+            console.error('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+  </script>
 </head>
 <body class="relative min-h-screen text-slate-900">
   <svg class="svg-defs-hidden" width="0" height="0" aria-hidden="true">

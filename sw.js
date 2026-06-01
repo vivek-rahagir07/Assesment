@@ -1,22 +1,19 @@
-const CACHE_NAME = 'talentcalibrate-v14';
-const ASSETS = [
+const CACHE_NAME = 'talentcalibrate-v15';
+
+// Core local assets that must succeed for install to pass
+const CORE_ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './manifest.json',
-  './photoes/logo.png',
-  'https://cdn.tailwindcss.com',
-  'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
-  'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+  './photoes/logo.png'
 ];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
   );
 });
 
@@ -40,8 +37,9 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Bypass Firestore, Firebase Auth, and Database API calls completely
   const url = e.request.url;
+
+  // Bypass Firestore, Firebase Auth, and Database API calls completely
   if (
     url.includes('firestore.googleapis.com') ||
     url.includes('firebaseio.com') ||
@@ -51,6 +49,17 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Handle navigation requests - fall back to cached index.html if network is offline
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(() => {
+        return caches.match('./index.html') || caches.match('./');
+      })
+    );
+    return;
+  }
+
+  // Cache-first for other assets, with dynamic network caching fallback
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -58,7 +67,6 @@ self.addEventListener('fetch', (e) => {
       }
 
       return fetch(e.request).then((networkResponse) => {
-        // Only cache valid standard GET responses
         if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -68,8 +76,14 @@ self.addEventListener('fetch', (e) => {
         return networkResponse;
       }).catch((err) => {
         console.warn('[ServiceWorker] Fetch failed for:', url, err);
-        // Fail silently or return standard offline response
       });
     })
   );
+});
+
+// Support skipWaiting on message
+self.addEventListener('message', (e) => {
+  if (e.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });

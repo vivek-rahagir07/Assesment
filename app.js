@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, getDoc, setDoc, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, getDoc, setDoc, getDocs, query, where, enableMultiTabIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 const app_id = typeof __app_id !== 'undefined' ? __app_id : 'interview-evaluator-pro';
 const rawFirebaseConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
@@ -20,6 +20,14 @@ const firebaseConfig = rawFirebaseConfig ? JSON.parse(rawFirebaseConfig) : fallb
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+enableMultiTabIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Firestore persistence failed: multiple tabs open');
+  } else if (err.code === 'unimplemented') {
+    console.warn('Firestore persistence not supported by this browser');
+  }
+});
 
 let user = null;
 let currentWorkspace = null;
@@ -205,7 +213,7 @@ const scheduleRenderAnalytics = () => {
   analyticsRenderTimer = setTimeout(renderAnalytics, isMobileDevice() ? 280 : 120);
 };
 
-const showToast = (message, type = 'success') => {
+const showToast = (message, type = 'success', persist = false) => {
   toastMsg.textContent = message;
   const styles = {
     error: 'bg-rose-50 border-rose-200 text-rose-800',
@@ -214,7 +222,9 @@ const showToast = (message, type = 'success') => {
   };
   toastWrapper.className = `mb-4 p-4 rounded-3xl flex items-center justify-between shadow-xs border transition-all ${styles[type] || styles.success}`;
   toastWrapper.classList.remove('hidden');
-  setTimeout(() => toastWrapper.classList.add('hidden'), 5000);
+  if (!persist) {
+    setTimeout(() => toastWrapper.classList.add('hidden'), 5000);
+  }
 };
 
 const NAV_IDLE = 'w-full flex items-center gap-3 rounded-3xl px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50';
@@ -584,9 +594,16 @@ const enterWorkspace = (wsName) => {
     loadWorkspaceSettings();
     loadInterviewDraft().then(() => renderDraftBanner());
     setupFirestoreSync();
-    switchTab('dashboard');
 
-    const panelCodeParam = new URLSearchParams(window.location.search).get('panel');
+    const urlParams = new URLSearchParams(window.location.search);
+    const shortcut = urlParams.get('shortcut');
+    if (shortcut === 'analytics') {
+      switchTab('class-analytics');
+    } else {
+      switchTab('dashboard');
+    }
+
+    const panelCodeParam = urlParams.get('panel');
     if (panelCodeParam) {
       setTimeout(() => joinPanelByCode(panelCodeParam), 400);
     }
@@ -4147,42 +4164,31 @@ if (btnShareWs) {
   });
 }
 
-// ==========================================
-// PWA SETUP, SERVICE WORKER & OFFLINE METRICS
-// ==========================================
-
-// 1. Robust Service Worker Registration
-if ('serviceWorker' in navigator) {
-  const registerSW = () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then((registration) => {
-        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-      })
-      .catch((error) => {
-        console.log('ServiceWorker registration failed: ', error);
-      });
-  };
-
-  if (document.readyState === 'complete') {
-    registerSW();
-  } else {
-    window.addEventListener('load', registerSW);
+// 1. Service Worker Update Notification
+window.addEventListener('sw-update-available', (e) => {
+  const reg = e.detail;
+  showToast('A new update is available. Click here to reload and update.', 'info', true);
+  if (toastWrapper) {
+    toastWrapper.style.cursor = 'pointer';
+    const handleUpdate = () => {
+      if (reg && reg.waiting) {
+        reg.waiting.postMessage('skipWaiting');
+      }
+      window.location.reload();
+    };
+    toastWrapper.addEventListener('click', handleUpdate, { once: true });
   }
-}
+});
 
 // 2. Custom A2HS (Add to Home Screen) Install Prompt
 let deferredPrompt;
 const btnInstallPwas = document.querySelectorAll('.btn-install-pwa');
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  // Prevent the mini-infobar from appearing on mobile
   e.preventDefault();
-  // Stash the event so it can be triggered later.
   deferredPrompt = e;
-  // Update UI to notify the user they can install the PWA
   btnInstallPwas.forEach(btn => {
     btn.classList.remove('hidden');
-    // Ensure display styles match properly
     if (btn.id === 'btn-install-pwa') {
       btn.classList.add('inline-flex');
     } else {
@@ -4194,14 +4200,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
 btnInstallPwas.forEach(btn => {
   btn.addEventListener('click', async () => {
     if (!deferredPrompt) return;
-    // Show the install prompt
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`PWA install prompt response: ${outcome}`);
-    // We've used the prompt, and can't use it again
     deferredPrompt = null;
-    // Hide all install buttons
     btnInstallPwas.forEach(b => {
       b.classList.add('hidden');
       b.classList.remove('inline-flex', 'flex');
