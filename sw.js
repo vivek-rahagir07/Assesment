@@ -1,4 +1,4 @@
-const CACHE_NAME = 'talentcalibrate-v15';
+const CACHE_NAME = 'talentcalibrate-v16';
 
 // Core local assets that must succeed for install to pass
 const CORE_ASSETS = [

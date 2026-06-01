@@ -4247,3 +4247,191 @@ if (!navigator.onLine) {
   showOfflineToast();
 }
 
+// ==========================================
+// CHATBOT ASSISTANT LOGIC
+// ==========================================
+
+const chatbotFab = document.getElementById('chatbot-fab');
+const chatbotPanel = document.getElementById('chatbot-panel');
+const chatbotClose = document.getElementById('chatbot-close');
+const chatbotMessages = document.getElementById('chatbot-messages');
+const chatbotForm = document.getElementById('chatbot-form');
+const chatbotInput = document.getElementById('chatbot-input');
+const chatbotChips = document.getElementById('chatbot-chips');
+
+if (chatbotFab && chatbotPanel && chatbotClose) {
+  // Toggle chatbot panel
+  chatbotFab.addEventListener('click', () => {
+    chatbotPanel.classList.toggle('is-active');
+    chatbotPanel.classList.toggle('hidden');
+    scrollToBottom();
+  });
+
+  chatbotClose.addEventListener('click', () => {
+    chatbotPanel.classList.remove('is-active');
+    chatbotPanel.classList.add('hidden');
+  });
+
+  // Handle suggested action chips
+  chatbotChips?.addEventListener('click', (e) => {
+    const button = e.target.closest('.chatbot-chip');
+    if (button) {
+      const queryText = button.textContent.trim();
+      handleUserQuery(queryText);
+    }
+  });
+
+  // Handle form submission
+  chatbotForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const queryText = chatbotInput.value.trim();
+    if (!queryText) return;
+    chatbotInput.value = '';
+    handleUserQuery(queryText);
+  });
+}
+
+function scrollToBottom() {
+  if (chatbotMessages) {
+    chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+  }
+}
+
+function handleUserQuery(queryText) {
+  // Append user message
+  appendChatMessage(queryText, 'user');
+  scrollToBottom();
+
+  // Show typing indicator
+  const typingIndicator = showTypingIndicator();
+  scrollToBottom();
+
+  // Process response after dynamic delay
+  setTimeout(() => {
+    removeTypingIndicator(typingIndicator);
+    const replyText = generateBotResponse(queryText);
+    appendChatMessage(replyText, 'bot');
+    scrollToBottom();
+  }, 750);
+}
+
+function appendChatMessage(text, sender) {
+  if (!chatbotMessages) return;
+
+  const msgDiv = document.createElement('div');
+  if (sender === 'user') {
+    msgDiv.className = 'max-w-[85%] self-end rounded-2xl rounded-tr-none bg-indigo-600 p-2.5 text-xs text-white leading-relaxed';
+    msgDiv.textContent = text;
+  } else {
+    msgDiv.className = 'flex items-start gap-2 max-w-[85%] self-start';
+    msgDiv.innerHTML = `
+      <div class="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs shrink-0">🤖</div>
+      <div class="rounded-2xl rounded-tl-none bg-slate-100 p-2.5 text-xs text-slate-800 leading-relaxed">${text}</div>
+    `;
+  }
+  chatbotMessages.appendChild(msgDiv);
+}
+
+function showTypingIndicator() {
+  if (!chatbotMessages) return null;
+  const indicatorDiv = document.createElement('div');
+  indicatorDiv.className = 'flex items-start gap-2 max-w-[85%] self-start';
+  indicatorDiv.innerHTML = `
+    <div class="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs shrink-0">🤖</div>
+    <div class="rounded-2xl rounded-tl-none bg-slate-100 p-2 text-xs text-slate-800 flex items-center">
+      <div class="typing-dots">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>
+  `;
+  chatbotMessages.appendChild(indicatorDiv);
+  return indicatorDiv;
+}
+
+function removeTypingIndicator(indicatorDiv) {
+  if (indicatorDiv && indicatorDiv.parentNode) {
+    indicatorDiv.parentNode.removeChild(indicatorDiv);
+  }
+}
+
+function generateBotResponse(query) {
+  const cleanQuery = query.toLowerCase();
+
+  // 1. Scoring & Formula queries
+  if (cleanQuery.includes('score') || cleanQuery.includes('calculate') || cleanQuery.includes('formula') || cleanQuery.includes('grade')) {
+    return `TalentCalibrate calculates overall percentage scores by combining weighted criteria ratings with behavioral questions:
+    <br/><br/>
+    • <strong>Criteria Assessment:</strong> Rates fields as Not Satisfactory (0), Satisfactory (1.5), or Very Satisfactory (3). The overall score is weighted against each criterion's weight (totaling 100%).
+    <br/>
+    • <strong>Checklist Modifiers:</strong> Checklist responses add modifiers (+/- points) based on selected options to fine-tune the calibration.`;
+  }
+
+  // 2. Panel Mode queries
+  if (cleanQuery.includes('panel') || cleanQuery.includes('together') || cleanQuery.includes('multi')) {
+    return `<strong>Panel Mode</strong> lets multiple interviewers evaluate candidates collectively:
+    <br/><br/>
+    1. Create a panel session in the dashboard.
+    <br/>
+    2. Share the generated session code with your team.
+    <br/>
+    3. Team members join using the code, and their individual scorecards are automatically averaged on the Calibration dashboard to ensure consistency.`;
+  }
+
+  // 3. Stats / Data queries (reads runtime values)
+  if (cleanQuery.includes('stats') || cleanQuery.includes('candidates') || cleanQuery.includes('count') || cleanQuery.includes('workspace')) {
+    const wsName = currentWorkspace || 'None';
+    const totalCount = candidates.length;
+    const topT = candidates.filter((c) => c.calculatedScore >= scoreThresholds.high).length;
+    const midT = candidates.filter((c) => c.calculatedScore >= scoreThresholds.low && c.calculatedScore < scoreThresholds.high).length;
+    const lowT = candidates.filter((c) => c.calculatedScore < scoreThresholds.low).length;
+
+    return `Here are the real-time statistics for the active workspace (<strong>${wsName}</strong>):
+    <br/><br/>
+    • <strong>Total Candidates Evaluated:</strong> ${totalCount}
+    <br/>
+    • <strong>Top Performers (≥${scoreThresholds.high}%):</strong> ${topT}
+    <br/>
+    • <strong>Mid Performers:</strong> ${midT}
+    <br/>
+    • <strong>Low Performers (<${scoreThresholds.low}%):</strong> ${lowT}`;
+  }
+
+  // 4. Template queries
+  if (cleanQuery.includes('template') || cleanQuery.includes('rubric') || cleanQuery.includes('criteria')) {
+    return `You currently have <strong>${templates.length}</strong> active evaluation blueprints. 
+    <br/><br/>
+    Standard rubrics assess 6 core criteria: Technical depth, System design, Execution, Communication, Leadership, and Cultural alignment. You can customize them in the 'Customize Rubrics Form' tab.`;
+  }
+
+  // 5. Export / download queries
+  if (cleanQuery.includes('export') || cleanQuery.includes('csv') || cleanQuery.includes('excel') || cleanQuery.includes('download') || cleanQuery.includes('pdf')) {
+    return `You can export data in several ways:
+    <br/><br/>
+    • <strong>Excel/CSV:</strong> Go to the 'Calibration & Analytics' tab and click the 'Download CSV' or 'Download Excel' buttons.
+    <br/>
+    • <strong>PDF Scorecard:</strong> In the dashboard table, click the PDF icon next to any candidate to download a styled summary report.`;
+  }
+
+  // 6. Offline / connection queries
+  if (cleanQuery.includes('offline') || cleanQuery.includes('sync') || cleanQuery.includes('network') || cleanQuery.includes('connection')) {
+    const status = navigator.onLine ? 'Online' : 'Offline';
+    return `TalentCalibrate is fully offline-resilient! Your current status is: <strong>${status}</strong>.
+    <br/><br/>
+    If offline, all evaluation drafts and completed scorecards are saved locally using IndexedDB persistence. They will sync automatically to the cloud when you connect.`;
+  }
+
+  // Fallback
+  return `I'm here to help you navigate TalentCalibrate! Try asking about:
+  <br/><br/>
+  • <em>"How are scores computed?"</em>
+  <br/>
+  • <em>"Explain Panel Mode"</em>
+  <br/>
+  • <em>"Show workspace stats"</em>
+  <br/>
+  • <em>"How do I export results?"</em>`;
+}
+
+

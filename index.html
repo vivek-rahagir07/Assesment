@@ -807,14 +807,67 @@
   <!-- Hidden print root for scorecards -->
   <div id="scorecard-print-root" class="scorecard-print-root hidden" aria-hidden="true"></div>
 
-  <!-- Floating Offline Notification -->
-  <div id="offline-toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-500 max-w-sm rounded-3xl border border-rose-200 bg-rose-50/95 backdrop-blur-md p-4 shadow-[0_20px_50px_rgba(244,63,94,0.15)] flex items-center gap-3">
+  <!-- Floating Offline Notification (Moved to bottom-left to prevent chat widget overlap) -->
+  <div id="offline-toast" class="fixed bottom-6 left-6 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-500 max-w-sm rounded-3xl border border-rose-200 bg-rose-50/95 backdrop-blur-md p-4 shadow-[0_20px_50px_rgba(244,63,94,0.15)] flex items-center gap-3">
     <div class="flex h-9 w-9 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-500/20">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/></svg>
     </div>
     <div>
       <h4 class="text-xs font-bold text-rose-900">Offline Mode</h4>
       <p class="text-[11px] text-rose-700/95 mt-0.5">Running offline. Saved scorecards will sync once connected.</p>
+    </div>
+  </div>
+
+  <!-- Floating Chatbot Assistant Widget -->
+  <div id="chatbot-widget" class="fixed bottom-6 right-6 z-40">
+    <!-- Floating Action Button (FAB) -->
+    <button id="chatbot-fab" class="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border-0" aria-label="Open support assistant">
+      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+      </svg>
+    </button>
+
+    <!-- Chat Panel -->
+    <div id="chatbot-panel" class="hidden absolute bottom-18 right-0 w-80 md:w-96 rounded-3xl border border-white/60 bg-white/80 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,23,42,0.15)] overflow-hidden flex flex-col transition-all duration-300 transform scale-95 opacity-0 origin-bottom-right">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-indigo-700 to-indigo-900 px-4 py-3.5 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-sm">🤖</div>
+          <div>
+            <h4 class="text-xs font-bold leading-tight">TalentCalibrate Assistant</h4>
+            <span class="text-[9px] text-indigo-200 flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Online & Offline Help</span>
+          </div>
+        </div>
+        <button id="chatbot-close" class="text-white hover:text-indigo-200 focus:outline-none transition border-0 bg-transparent cursor-pointer" aria-label="Close assistant">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <!-- Messages body -->
+      <div id="chatbot-messages" class="flex-1 p-4 space-y-3 overflow-y-auto max-h-72 min-h-[16rem] flex flex-col">
+        <!-- Welcome message -->
+        <div class="flex items-start gap-2 max-w-[85%] self-start">
+          <div class="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs shrink-0">🤖</div>
+          <div class="rounded-2xl rounded-tl-none bg-slate-100 p-2.5 text-xs text-slate-800 leading-relaxed">
+            Hi! I am your TalentCalibrate copilot. Ask me about grading, panel mode, candidate stats, or how to use the evaluation tools!
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Suggested Chips -->
+      <div id="chatbot-chips" class="px-4 pb-2 pt-1 flex flex-wrap gap-1.5 border-t border-slate-100/50 bg-slate-50/50">
+        <button class="chatbot-chip rounded-full border border-indigo-100 bg-indigo-50/50 px-2.5 py-1 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100 transition cursor-pointer">How is score calculated?</button>
+        <button class="chatbot-chip rounded-full border border-indigo-100 bg-indigo-50/50 px-2.5 py-1 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100 transition cursor-pointer">Explain Panel Mode</button>
+        <button class="chatbot-chip rounded-full border border-indigo-100 bg-indigo-50/50 px-2.5 py-1 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100 transition cursor-pointer">Show Workspace Stats</button>
+      </div>
+
+      <!-- Chat input -->
+      <form id="chatbot-form" class="p-3 border-t border-slate-100 bg-white/90 flex gap-2 items-center m-0">
+        <input type="text" id="chatbot-input" required class="flex-1 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none placeholder-slate-400" placeholder="Type your query..." autocomplete="off" />
+        <button type="submit" class="h-8 w-8 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-md transition shrink-0 border-0 cursor-pointer">
+          <svg class="h-4 w-4 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+        </button>
+      </form>
     </div>
   </div>
 
