@@ -4365,18 +4365,19 @@ function handleUserQuery(queryText) {
   const typingIndicator = showTypingIndicator();
   scrollToBottom();
 
-  const dynamicDelay = Math.min(1100, 450 + queryText.length * 18);
+  const dynamicDelay = Math.min(1200, 450 + queryText.length * 18);
 
   setTimeout(() => {
     removeTypingIndicator(typingIndicator);
     const replyText = generateBotResponse(queryText);
-    appendChatMessage(replyText, 'bot');
-    scrollToBottom();
-    chatbotIsProcessing = false;
+    appendChatMessage(replyText, 'bot', true, () => {
+      chatbotIsProcessing = false;
+      scrollToBottom();
+    });
   }, dynamicDelay);
 }
 
-function appendChatMessage(text, sender) {
+function appendChatMessage(text, sender, animate = false, finishedCallback) {
   if (!chatbotMessages) return;
 
   const msgDiv = document.createElement('div');
@@ -4387,10 +4388,38 @@ function appendChatMessage(text, sender) {
     msgDiv.className = 'flex items-start gap-2 max-w-[85%] self-start';
     msgDiv.innerHTML = `
       <div class="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs shrink-0">🤖</div>
-      <div class="rounded-2xl rounded-tl-none bg-slate-100 p-2.5 text-xs text-slate-800 leading-relaxed">${text}</div>
     `;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'rounded-2xl rounded-tl-none bg-slate-100 p-2.5 text-xs text-slate-800 leading-relaxed whitespace-pre-wrap break-words';
+    if (animate) {
+      typewriterReveal(bubble, text, finishedCallback);
+    } else {
+      bubble.textContent = text;
+      if (finishedCallback) finishedCallback();
+    }
+    msgDiv.appendChild(bubble);
   }
+
   chatbotMessages.appendChild(msgDiv);
+}
+
+function typewriterReveal(element, text, finishedCallback) {
+  const normalizedText = String(text).replace(/<br\/?/gi, '\n');
+  let index = 0;
+  const speed = Math.max(12, Math.min(30, 750 / Math.max(1, normalizedText.length)));
+
+  function step() {
+    element.textContent = normalizedText.slice(0, index);
+    index += 1;
+    if (index <= normalizedText.length) {
+      setTimeout(step, speed);
+    } else if (finishedCallback) {
+      finishedCallback();
+    }
+  }
+
+  step();
 }
 
 function showTypingIndicator() {
@@ -4423,34 +4452,28 @@ function generateBotResponse(query) {
   // 0. General help and introduction
   if (cleanQuery.includes('help') || cleanQuery.includes('what can') || cleanQuery.includes('how do i') || cleanQuery.includes('usage')) {
     return `I can help you with TalentCalibrate features, scoring, panel mode, exports, and workspace analytics.
-    <br/><br/>
-    • Ask about score calculation, exports, or panel workflow.
-    <br/>
-    • Ask "Show workspace stats" to see current candidate totals.
-    <br/>
-    • Ask "Explain Panel Mode" if you want team evaluation guidance.`;
+
+• Ask about score calculation, exports, or panel workflow.
+• Ask "Show workspace stats" to see current candidate totals.
+• Ask "Explain Panel Mode" if you want team evaluation guidance.`;
   }
 
   // 1. Scoring & Formula queries
   if (cleanQuery.includes('score') || cleanQuery.includes('calculate') || cleanQuery.includes('formula') || cleanQuery.includes('grade') || cleanQuery.includes('rating')) {
     return `TalentCalibrate calculates overall percentage scores by combining weighted criteria ratings with checklist modifiers:
-    <br/><br/>
-    • <strong>Criteria assessment:</strong> Each criterion is rated from Not Satisfactory to Very Satisfactory.
-    <br/>
-    • <strong>Weighting:</strong> Criteria weights are combined to form a normalized total score.
-    <br/>
-    • <strong>Modifiers:</strong> checklist questions and evaluator comments adjust calibration and final recommendations.`;
+
+• Criteria assessment: Each criterion is rated from Not Satisfactory to Very Satisfactory.
+• Weighting: Criteria weights are combined to form a normalized total score.
+• Modifiers: Checklist questions and evaluator comments adjust calibration and final recommendations.`;
   }
 
   // 2. Panel Mode queries
   if (cleanQuery.includes('panel') || cleanQuery.includes('together') || cleanQuery.includes('multi')) {
-    return `<strong>Panel Mode</strong> lets multiple interviewers evaluate candidates collectively:
-    <br/><br/>
-    1. Create a panel session in the dashboard.
-    <br/>
-    2. Share the generated session code with your team.
-    <br/>
-    3. Team members join using the code, and their individual scorecards are automatically averaged on the Calibration dashboard to ensure consistency.`;
+    return `Panel Mode lets multiple interviewers evaluate candidates collectively:
+
+1. Create a panel session in the dashboard.
+2. Share the generated session code with your team.
+3. Team members join using the code, and their individual scorecards are automatically averaged on the Calibration dashboard to ensure consistency.`;
   }
 
   // 3. Stats / Data queries (reads runtime values)
@@ -4461,15 +4484,12 @@ function generateBotResponse(query) {
     const midT = candidates.filter((c) => c.calculatedScore >= scoreThresholds.low && c.calculatedScore < scoreThresholds.high).length;
     const lowT = candidates.filter((c) => c.calculatedScore < scoreThresholds.low).length;
 
-    return `Here are the real-time statistics for the active workspace (<strong>${wsName}</strong>):
-    <br/><br/>
-    • <strong>Total Candidates Evaluated:</strong> ${totalCount}
-    <br/>
-    • <strong>Top Performers (≥${scoreThresholds.high}%):</strong> ${topT}
-    <br/>
-    • <strong>Mid Performers:</strong> ${midT}
-    <br/>
-    • <strong>Low Performers (<${scoreThresholds.low}%):</strong> ${lowT}`;
+    return `Here are the real-time statistics for the active workspace (${wsName}):
+
+• Total Candidates Evaluated: ${totalCount}
+• Top Performers (≥${scoreThresholds.high}%): ${topT}
+• Mid Performers: ${midT}
+• Low Performers (<${scoreThresholds.low}%): ${lowT}`;
   }
 
   // 4. Template queries
@@ -4482,30 +4502,26 @@ function generateBotResponse(query) {
   // 5. Export / download queries
   if (cleanQuery.includes('export') || cleanQuery.includes('csv') || cleanQuery.includes('excel') || cleanQuery.includes('download') || cleanQuery.includes('pdf')) {
     return `You can export data in several ways:
-    <br/><br/>
-    • <strong>Excel/CSV:</strong> Go to the 'Calibration & Analytics' tab and click the 'Download CSV' or 'Download Excel' buttons.
-    <br/>
-    • <strong>PDF Scorecard:</strong> In the dashboard table, click the PDF icon next to any candidate to download a styled summary report.`;
+
+• Excel/CSV: Go to the Calibration & Analytics tab and click the Download CSV or Download Excel buttons.
+• PDF Scorecard: In the dashboard table, click the PDF icon next to any candidate to download a styled summary report.`;
   }
 
   // 6. Offline / connection queries
   if (cleanQuery.includes('offline') || cleanQuery.includes('sync') || cleanQuery.includes('network') || cleanQuery.includes('connection')) {
     const status = navigator.onLine ? 'Online' : 'Offline';
-    return `TalentCalibrate is fully offline-resilient! Your current status is: <strong>${status}</strong>.
-    <br/><br/>
-    If offline, all evaluation drafts and completed scorecards are saved locally using IndexedDB persistence. They will sync automatically to the cloud when you connect.`;
+    return `TalentCalibrate is fully offline-resilient! Your current status is: ${status}.
+
+If offline, all evaluation drafts and completed scorecards are saved locally using IndexedDB persistence. They will sync automatically to the cloud when you connect.`;
   }
 
   // Fallback
   return `I'm here to help you navigate TalentCalibrate! Try asking about:
-  <br/><br/>
-  • <em>"How are scores computed?"</em>
-  <br/>
-  • <em>"Explain Panel Mode"</em>
-  <br/>
-  • <em>"Show workspace stats"</em>
-  <br/>
-  • <em>"How do I export results?"</em>`;
+
+• "How are scores computed?"
+• "Explain Panel Mode"
+• "Show workspace stats"
+• "How do I export results?"`;
 }
 
 
