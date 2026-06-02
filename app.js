@@ -607,6 +607,13 @@ const enterWorkspace = (wsName) => {
     if (panelCodeParam) {
       setTimeout(() => joinPanelByCode(panelCodeParam), 400);
     }
+    // Auto-run post-auth tour for users who haven't seen it yet
+    try {
+      const seenPost = localStorage.getItem(TOUR_KEY_POST);
+      if (!seenPost) {
+        setTimeout(() => startTour(postTourSteps, true), 900);
+      }
+    } catch (e) {}
   } catch (e) {
     console.error('Error loading workspace:', e);
   }
@@ -4271,20 +4278,27 @@ const tourNext = document.getElementById('tour-next');
 const tourPrev = document.getElementById('tour-prev');
 const tourSkip = document.getElementById('tour-skip');
 
-const TOUR_KEY = 'talentcal_quickguide_seen_v1';
+const TOUR_KEY_PRE = 'talentcal_quickguide_seen_pre_v1';
+const TOUR_KEY_POST = 'talentcal_quickguide_seen_post_v1';
 
-const tourSteps = [
+// Steps for the landing (pre-auth) tour
+const preTourSteps = [
   { selector: '#btn-mode-create', title: 'Create a workspace', desc: 'Start by creating a new workspace for your team. This stores templates and candidates.' },
+  { selector: '#btn-mode-enter', title: 'Enter workspace', desc: 'If you already have credentials, enter an existing workspace here.' }
+];
+
+// Steps for the main app (post-auth) tour
+const postTourSteps = [
   { selector: '#nav-dashboard', title: 'Evaluation Rubrics', desc: 'Your blueprints live here. Pick a template to start evaluating candidates.' },
   { selector: '#nav-form-builder', title: 'Customize Rubrics', desc: 'Create or edit templates and adjust criteria weights and questions.' },
   { selector: '#nav-class-analytics', title: 'Calibration & Analytics', desc: 'View workspace-level stats, export CSV/Excel, and monitor calibration.' },
-  // panel join button lives inside dashboard content; ensure dashboard tab is active before targeting
   { selector: '#btn-join-panel-dashboard', title: 'Panel Mode', desc: 'Start or join a panel session so multiple evaluators can score the same candidate.', tab: 'dashboard' },
   { selector: '#chatbot-fab', title: 'Assistant', desc: 'Open the assistant for quick help, exports, and guidance at any time.' },
   { selector: '#btn-switch-ws', title: 'Workspace Switch', desc: 'Use this to switch between different workspaces or teams quickly.' }
 ];
 
 let tourIndex = 0;
+let activeTourSteps = preTourSteps;
 
 // wait for an element to exist and be visible
 function waitForElement(selector, timeout = 1200) {
@@ -4310,7 +4324,7 @@ function waitForElement(selector, timeout = 1200) {
 }
 
 async function showTourStep(index) {
-  const step = tourSteps[index];
+  const step = activeTourSteps[index];
   if (!step) return endTour();
 
   tourOverlay.classList.remove('hidden');
@@ -4362,33 +4376,41 @@ async function showTourStep(index) {
 
   // update nav buttons
   tourPrev.disabled = index === 0;
-  tourNext.textContent = index === tourSteps.length - 1 ? 'Finish' : 'Next';
+  tourNext.textContent = index === activeTourSteps.length - 1 ? 'Finish' : 'Next';
 }
 
-async function startTour(auto = false) {
+async function startTour(steps = null, auto = false) {
+  // choose which steps array to use
+  activeTourSteps = Array.isArray(steps) ? steps : activeTourSteps;
   tourIndex = 0;
   await showTourStep(tourIndex);
   if (auto) {
-    // mark seen so it doesn't auto-open every load
-    try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
+    try {
+      // mark the corresponding key as seen
+      if (activeTourSteps === preTourSteps) localStorage.setItem(TOUR_KEY_PRE, '1');
+      else localStorage.setItem(TOUR_KEY_POST, '1');
+    } catch (e) {}
   }
 }
 
-function nextTour() { tourIndex += 1; if (tourIndex >= tourSteps.length) endTour(); else showTourStep(tourIndex); }
+function nextTour() { tourIndex += 1; if (tourIndex >= activeTourSteps.length) endTour(); else showTourStep(tourIndex); }
 function prevTour() { if (tourIndex > 0) { tourIndex -= 1; showTourStep(tourIndex); } }
 function endTour() { tourOverlay.classList.add('hidden'); tourOverlay.style.pointerEvents = 'none'; }
-
-if (btnQuickGuide) btnQuickGuide.addEventListener('click', () => startTour(true));
+if (btnQuickGuide) btnQuickGuide.addEventListener('click', () => {
+  // run post-auth tour if workspace is active, otherwise run the pre-auth tour
+  if (currentWorkspace) startTour(postTourSteps, true);
+  else startTour(preTourSteps, true);
+});
 if (tourNext) tourNext.addEventListener('click', () => nextTour());
 if (tourPrev) tourPrev.addEventListener('click', () => prevTour());
-if (tourSkip) tourSkip.addEventListener('click', () => { endTour(); try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {} });
+if (tourSkip) tourSkip.addEventListener('click', () => { endTour(); try { if (activeTourSteps === preTourSteps) localStorage.setItem(TOUR_KEY_PRE, '1'); else localStorage.setItem(TOUR_KEY_POST, '1'); } catch (e) {} });
 
-// Auto-run tour for first-time users (unless they've seen it)
+// Auto-run pre-auth tour for first-time users (unless they've seen it)
 try {
-  const seen = localStorage.getItem(TOUR_KEY);
-  if (!seen) {
+  const seenPre = localStorage.getItem(TOUR_KEY_PRE);
+  if (!seenPre) {
     // delay slightly to allow layout to stabilize
-    setTimeout(() => startTour(true), 900);
+    setTimeout(() => startTour(preTourSteps, true), 900);
   }
 } catch (e) {}
 
