@@ -4278,56 +4278,96 @@ const tourSteps = [
   { selector: '#nav-dashboard', title: 'Evaluation Rubrics', desc: 'Your blueprints live here. Pick a template to start evaluating candidates.' },
   { selector: '#nav-form-builder', title: 'Customize Rubrics', desc: 'Create or edit templates and adjust criteria weights and questions.' },
   { selector: '#nav-class-analytics', title: 'Calibration & Analytics', desc: 'View workspace-level stats, export CSV/Excel, and monitor calibration.' },
-  { selector: '#btn-join-panel-dashboard', title: 'Panel Mode', desc: 'Start or join a panel session so multiple evaluators can score the same candidate.' },
+  // panel join button lives inside dashboard content; ensure dashboard tab is active before targeting
+  { selector: '#btn-join-panel-dashboard', title: 'Panel Mode', desc: 'Start or join a panel session so multiple evaluators can score the same candidate.', tab: 'dashboard' },
   { selector: '#chatbot-fab', title: 'Assistant', desc: 'Open the assistant for quick help, exports, and guidance at any time.' },
   { selector: '#btn-switch-ws', title: 'Workspace Switch', desc: 'Use this to switch between different workspaces or teams quickly.' }
 ];
 
 let tourIndex = 0;
 
-function showTourStep(index) {
+// wait for an element to exist and be visible
+function waitForElement(selector, timeout = 1200) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      const el = document.querySelector(selector);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          resolve(el);
+          return;
+        }
+      }
+      if (Date.now() - start > timeout) {
+        resolve(null);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
+async function showTourStep(index) {
   const step = tourSteps[index];
   if (!step) return endTour();
-  const el = document.querySelector(step.selector);
 
   tourOverlay.classList.remove('hidden');
   tourOverlay.style.pointerEvents = 'auto';
 
-  // Default tooltip position (center) if element not found
+  // if step requests a tab, switch to it first and allow layout to settle
+  if (step.tab && typeof switchTab === 'function') {
+    try { switchTab(step.tab); } catch (e) {}
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  // wait for the element to appear/become visible
+  const el = await waitForElement(step.selector, 1600);
+
+  // Default rectangle (center) if element not found
   let rect = { top: window.innerHeight / 2 - 80, left: window.innerWidth / 2 - 160, width: 320, height: 120 };
   if (el) {
+    // scroll element into view gently then re-measure
+    try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    await new Promise(r => setTimeout(r, 220));
     rect = el.getBoundingClientRect();
-    // scroll into view if needed
-    if (rect.top < 0 || rect.bottom > window.innerHeight) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      rect = el.getBoundingClientRect();
-    }
   }
 
   const pad = 8;
   // position highlight box around element
   tourHighlight.style.width = (rect.width + pad * 2) + 'px';
   tourHighlight.style.height = (rect.height + pad * 2) + 'px';
-  tourHighlight.style.left = (rect.left - pad) + 'px';
-  tourHighlight.style.top = (rect.top - pad) + 'px';
+  tourHighlight.style.left = Math.max(6, rect.left - pad) + 'px';
+  tourHighlight.style.top = Math.max(6, rect.top - pad) + 'px';
 
-  // tooltip placement: prefer below the element
-  const ttLeft = Math.max(12, rect.left);
-  const ttTop = rect.bottom + 14;
-  tourTooltip.style.left = ttLeft + 'px';
-  tourTooltip.style.top = ttTop + 'px';
-
+  // tooltip placement: prefer below the element, fallback above if out of viewport
   tourTitle.textContent = step.title;
   tourDesc.textContent = step.desc;
+
+  const tooltipRect = tourTooltip.getBoundingClientRect();
+  let ttLeft = Math.max(12, rect.left);
+  // clamp horizontally so tooltip stays inside viewport
+  ttLeft = Math.min(ttLeft, Math.max(12, window.innerWidth - tooltipRect.width - 12));
+  let ttTop = rect.bottom + 14;
+  // if tooltip would overflow bottom, place it above target
+  if (ttTop + tooltipRect.height > window.innerHeight - 12) {
+    ttTop = rect.top - tooltipRect.height - 14;
+  }
+
+  tourTooltip.style.left = ttLeft + 'px';
+  tourTooltip.style.top = Math.max(12, ttTop) + 'px';
+
+
 
   // update nav buttons
   tourPrev.disabled = index === 0;
   tourNext.textContent = index === tourSteps.length - 1 ? 'Finish' : 'Next';
 }
 
-function startTour(auto = false) {
+async function startTour(auto = false) {
   tourIndex = 0;
-  showTourStep(tourIndex);
+  await showTourStep(tourIndex);
   if (auto) {
     // mark seen so it doesn't auto-open every load
     try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
