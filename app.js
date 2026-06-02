@@ -4254,10 +4254,58 @@ if (!navigator.onLine) {
 const chatbotFab = document.getElementById('chatbot-fab');
 const chatbotPanel = document.getElementById('chatbot-panel');
 const chatbotClose = document.getElementById('chatbot-close');
+const chatbotClear = document.getElementById('chatbot-clear');
 const chatbotMessages = document.getElementById('chatbot-messages');
 const chatbotForm = document.getElementById('chatbot-form');
 const chatbotInput = document.getElementById('chatbot-input');
 const chatbotChips = document.getElementById('chatbot-chips');
+
+const CHATBOT_SUGGESTED_TOPICS = [
+  'How is score calculated?',
+  'Explain Panel Mode',
+  'Show workspace stats',
+  'How do I export results?',
+  'What can you ask?'
+];
+
+const CHATBOT_WELCOME_MESSAGE = `Hi! I am your TalentCalibrate assistant. Ask me about grading, panel mode, candidate stats, or how to use the evaluation tools!`;
+
+let chatbotIsProcessing = false;
+
+function sanitizeBotReply(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\n/g, '<br/>');
+}
+
+function updateChatbotSuggestions() {
+  if (!chatbotChips) return;
+  chatbotChips.innerHTML = '';
+  CHATBOT_SUGGESTED_TOPICS.slice(0, 5).forEach((topic) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chatbot-chip rounded-full border border-indigo-100 bg-indigo-50/50 px-2.5 py-1 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100 transition cursor-pointer';
+    chip.textContent = topic;
+    chatbotChips.appendChild(chip);
+  });
+}
+
+function resetChatbotMessages() {
+  if (!chatbotMessages) return;
+  chatbotMessages.innerHTML = '';
+  const welcomeDiv = document.createElement('div');
+  welcomeDiv.className = 'flex items-start gap-2 max-w-[85%] self-start';
+  welcomeDiv.innerHTML = `
+    <div class="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs shrink-0">🤖</div>
+    <div class="rounded-2xl rounded-tl-none bg-slate-100 p-2.5 text-xs text-slate-800 leading-relaxed">${sanitizeBotReply(CHATBOT_WELCOME_MESSAGE)}</div>
+  `;
+  chatbotMessages.appendChild(welcomeDiv);
+  scrollToBottom();
+}
 
 if (chatbotFab && chatbotPanel && chatbotClose) {
   // Toggle chatbot panel
@@ -4272,6 +4320,10 @@ if (chatbotFab && chatbotPanel && chatbotClose) {
     chatbotPanel.classList.add('hidden');
   });
 
+  chatbotClear?.addEventListener('click', () => {
+    resetChatbotMessages();
+  });
+
   // Handle suggested action chips
   chatbotChips?.addEventListener('click', (e) => {
     const button = e.target.closest('.chatbot-chip');
@@ -4284,11 +4336,15 @@ if (chatbotFab && chatbotPanel && chatbotClose) {
   // Handle form submission
   chatbotForm?.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (chatbotIsProcessing) return;
     const queryText = chatbotInput.value.trim();
     if (!queryText) return;
     chatbotInput.value = '';
     handleUserQuery(queryText);
   });
+
+  updateChatbotSuggestions();
+  resetChatbotMessages();
 }
 
 function scrollToBottom() {
@@ -4298,6 +4354,9 @@ function scrollToBottom() {
 }
 
 function handleUserQuery(queryText) {
+  if (chatbotIsProcessing) return;
+  chatbotIsProcessing = true;
+
   // Append user message
   appendChatMessage(queryText, 'user');
   scrollToBottom();
@@ -4306,13 +4365,15 @@ function handleUserQuery(queryText) {
   const typingIndicator = showTypingIndicator();
   scrollToBottom();
 
-  // Process response after dynamic delay
+  const dynamicDelay = Math.min(1100, 450 + queryText.length * 18);
+
   setTimeout(() => {
     removeTypingIndicator(typingIndicator);
     const replyText = generateBotResponse(queryText);
     appendChatMessage(replyText, 'bot');
     scrollToBottom();
-  }, 750);
+    chatbotIsProcessing = false;
+  }, dynamicDelay);
 }
 
 function appendChatMessage(text, sender) {
@@ -4359,13 +4420,26 @@ function removeTypingIndicator(indicatorDiv) {
 function generateBotResponse(query) {
   const cleanQuery = query.toLowerCase();
 
-  // 1. Scoring & Formula queries
-  if (cleanQuery.includes('score') || cleanQuery.includes('calculate') || cleanQuery.includes('formula') || cleanQuery.includes('grade')) {
-    return `TalentCalibrate calculates overall percentage scores by combining weighted criteria ratings with behavioral questions:
+  // 0. General help and introduction
+  if (cleanQuery.includes('help') || cleanQuery.includes('what can') || cleanQuery.includes('how do i') || cleanQuery.includes('usage')) {
+    return `I can help you with TalentCalibrate features, scoring, panel mode, exports, and workspace analytics.
     <br/><br/>
-    • <strong>Criteria Assessment:</strong> Rates fields as Not Satisfactory (0), Satisfactory (1.5), or Very Satisfactory (3). The overall score is weighted against each criterion's weight (totaling 100%).
+    • Ask about score calculation, exports, or panel workflow.
     <br/>
-    • <strong>Checklist Modifiers:</strong> Checklist responses add modifiers (+/- points) based on selected options to fine-tune the calibration.`;
+    • Ask "Show workspace stats" to see current candidate totals.
+    <br/>
+    • Ask "Explain Panel Mode" if you want team evaluation guidance.`;
+  }
+
+  // 1. Scoring & Formula queries
+  if (cleanQuery.includes('score') || cleanQuery.includes('calculate') || cleanQuery.includes('formula') || cleanQuery.includes('grade') || cleanQuery.includes('rating')) {
+    return `TalentCalibrate calculates overall percentage scores by combining weighted criteria ratings with checklist modifiers:
+    <br/><br/>
+    • <strong>Criteria assessment:</strong> Each criterion is rated from Not Satisfactory to Very Satisfactory.
+    <br/>
+    • <strong>Weighting:</strong> Criteria weights are combined to form a normalized total score.
+    <br/>
+    • <strong>Modifiers:</strong> checklist questions and evaluator comments adjust calibration and final recommendations.`;
   }
 
   // 2. Panel Mode queries

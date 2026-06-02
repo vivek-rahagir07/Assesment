@@ -838,9 +838,12 @@
             <span class="text-[9px] text-indigo-200 flex items-center gap-1"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Online & Offline Help</span>
           </div>
         </div>
-        <button id="chatbot-close" class="text-white hover:text-indigo-200 focus:outline-none transition border-0 bg-transparent cursor-pointer" aria-label="Close assistant">
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
+        <div class="flex items-center gap-2">
+          <button id="chatbot-clear" type="button" class="text-indigo-100 hover:text-white text-[11px] font-semibold transition border-0 bg-transparent cursor-pointer">Clear</button>
+          <button id="chatbot-close" class="text-white hover:text-indigo-200 focus:outline-none transition border-0 bg-transparent cursor-pointer" aria-label="Close assistant">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Messages body -->
@@ -849,7 +852,7 @@
         <div class="flex items-start gap-2 max-w-[85%] self-start">
           <div class="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs shrink-0">🤖</div>
           <div class="rounded-2xl rounded-tl-none bg-slate-100 p-2.5 text-xs text-slate-800 leading-relaxed">
-            Hi! I am your TalentCalibrate copilot. Ask me about grading, panel mode, candidate stats, or how to use the evaluation tools!
+            Hi! I am your TalentCalibrate assistant. Ask me about grading, panel mode, candidate stats, or how to use the evaluation tools!
           </div>
         </div>
       </div>
