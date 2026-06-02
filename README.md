@@ -1,153 +1,179 @@
-# 🚀 TalentCalibrate
-### Intelligent Interview Assessment, Candidate Evaluation & Team Calibration Platform
+# <p align="center">🎯 TalentCalibrate</p>
 
 <p align="center">
-  <img src="photoes/logo.png" width="180" alt="TalentCalibrate Logo">
+  <img src="photoes/logo.png" alt="TalentCalibrate Logo" width="180">
 </p>
 
 <p align="center">
-  <h3 align="center">Measure Potential. Calibrate Talent. Hire with Confidence.</h3>
+  <b>Measure Potential • Calibrate Talent • Hire with Confidence</b>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PWA-Ready-4F46E5?style=for-the-badge">
+  A next-generation Interview Intelligence Platform designed to transform subjective interviews into structured, data-driven hiring decisions.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/PWA-Enabled-6366F1?style=for-the-badge">
   <img src="https://img.shields.io/badge/Firebase-Powered-FFCA28?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Offline-Supported-10B981?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Offline-Ready-10B981?style=for-the-badge">
   <img src="https://img.shields.io/badge/Analytics-Driven-8B5CF6?style=for-the-badge">
 </p>
 
 ---
 
-# 📖 About TalentCalibrate
+# 🚀 Overview
 
-**TalentCalibrate** is a next-generation interview assessment platform built to transform traditional hiring into a structured, data-driven, and collaborative evaluation process.
+**TalentCalibrate** is a powerful Interview Assessment & Candidate Evaluation Platform that enables recruiters, hiring managers, HR teams, faculty panels, placement cells, and organizations to conduct fair, structured, and highly consistent candidate assessments.
 
-Whether you're conducting:
+Instead of relying on subjective opinions and memory-based judgments, TalentCalibrate creates a standardized evaluation framework where every candidate is assessed against predefined criteria, weighted rubrics, and measurable performance indicators.
 
-- Campus Placements
-- Internship Drives
-- Corporate Hiring
-- Faculty Recruitment
-- Scholarship Interviews
-- Assessment Centers
+The result?
 
-TalentCalibrate ensures every candidate is evaluated fairly, consistently, and transparently.
-
-Instead of relying on subjective opinions, interviewers can use customizable rubrics, structured scorecards, panel assessments, analytics dashboards, and calibration tools to make confident hiring decisions.
+✅ Better hiring decisions  
+✅ Reduced interviewer bias  
+✅ Transparent evaluations  
+✅ Consistent candidate ranking  
+✅ Data-backed recommendations  
 
 ---
 
-# 🎯 Problem We Solve
+# 🌟 Why TalentCalibrate?
 
-Traditional interview processes often suffer from:
+Traditional interviews often suffer from:
 
-❌ Interviewer Bias
+- Different interviewers evaluating differently
+- No standard scoring system
+- Lack of accountability
+- Difficult candidate comparisons
+- Bias and inconsistency
+- Poor documentation
 
-❌ Inconsistent Scoring
+TalentCalibrate solves these challenges through:
 
-❌ Poor Documentation
+🎯 Structured Rubrics
 
-❌ Lack of Transparency
+📊 Real-Time Analytics
 
-❌ Difficult Candidate Comparison
+👥 Panel-Based Evaluation
 
-❌ No Team Calibration
+📁 Candidate Scorecards
 
-❌ Unstructured Hiring Decisions
+📈 Calibration Intelligence
 
-TalentCalibrate solves these challenges through standardized evaluation frameworks and intelligent analytics.
+📤 Reporting & Exports
+
+🔒 Secure Workspaces
 
 ---
 
-# ✨ Core Features
+# 🏗 Core Architecture
+
+```text
+Workspace
+    │
+    ├── Interview Templates
+    │       ├── Rubrics
+    │       ├── Criteria
+    │       ├── Weights
+    │       └── Questions
+    │
+    ├── Candidates
+    │       ├── Profile
+    │       ├── Resume
+    │       └── Assessment Data
+    │
+    ├── Interview Sessions
+    │       ├── Solo Mode
+    │       └── Panel Mode
+    │
+    └── Analytics Engine
+            ├── Candidate Insights
+            ├── Performance Distribution
+            ├── Ranking
+            └── Exports
+```
+
+---
+
+# ✨ Features
 
 ---
 
 ## 🏢 Workspace Management
 
-Create dedicated workspaces for:
+Create independent workspaces for:
 
-- Departments
-- Hiring Campaigns
+- Recruitment Campaigns
+- Hiring Drives
 - Placement Seasons
-- Recruitment Teams
+- Departments
 - Assessment Programs
 
 Each workspace contains:
 
-- Interview Templates
-- Candidate Records
+- Templates
+- Candidates
 - Analytics
-- Panel Sessions
 - Reports
+- Evaluators
 
 ### Benefits
 
-✔ Secure Access
-
-✔ Team Collaboration
-
-✔ Organized Hiring Process
-
-✔ Multi-Recruiter Support
+- Better organization
+- Secure separation of data
+- Team collaboration
+- Multi-project support
 
 ---
 
-## 📋 Smart Rubric Builder
+## 📋 Interview Rubric Builder
 
-Design fully customizable interview evaluation forms.
+Create highly customizable evaluation forms.
 
-### Create Evaluation Criteria
+### Configure
 
-Examples:
-
-- Communication Skills
-- Technical Knowledge
-- Problem Solving
-- Presentation Skills
-- Teamwork
-- Leadership
-- Domain Expertise
-
-### Customize
-
-- Criteria Name
-- Description
+- Evaluation Criteria
 - Weightage
-- Maximum Score
+- Categories
+- Questions
+- Notes
 - Evaluation Scale
 
-### Advantages
+### Example Rubric
 
-✔ Consistent Assessments
+| Criteria | Weight |
+|-----------|---------|
+| Communication Skills | 15% |
+| Presentation Skills | 15% |
+| Resume Quality | 15% |
+| Problem Solving | 25% |
+| Technical Knowledge | 15% |
+| Organizational Fit | 15% |
 
-✔ Role-Specific Evaluation
-
-✔ Fair Candidate Comparison
+Every interviewer evaluates candidates using the exact same framework.
 
 ---
 
-## 🎤 Live Interview Mode
+## 🎯 Live Interview Mode
 
-Conduct interviews directly inside the platform.
+Conduct structured interviews directly within the platform.
 
 ### Features
 
-- Real-Time Scoring
+- Real-Time Evaluation
 - Candidate Notes
 - Interview Timer
-- Auto Save
-- Resume Review
+- Autosave
 - Draft Recovery
-- Structured Feedback Collection
+- Instant Scoring
 
-Interviewers focus on conversations while TalentCalibrate handles documentation automatically.
+Interviewers can focus entirely on conversations while TalentCalibrate handles documentation automatically.
 
 ---
 
-## 👥 Panel Interview Mode
+## 👥 Panel Mode
 
-One of the most powerful capabilities of TalentCalibrate.
+One of the most powerful features of TalentCalibrate.
 
 ### Workflow
 
@@ -158,185 +184,194 @@ Generate Join Code
       ↓
 Invite Evaluators
       ↓
-Evaluate Candidate
+Independent Assessment
       ↓
-Aggregate Scores
+Automatic Score Aggregation
       ↓
-Generate Final Recommendation
+Final Recommendation
 ```
 
-### Benefits
+### Advantages
 
-✔ Eliminates Individual Bias
+- Removes individual bias
+- Encourages evaluator alignment
+- Improves hiring confidence
+- Supports collaborative decision making
 
-✔ Encourages Fair Decisions
+Perfect for:
 
-✔ Supports Large Hiring Drives
-
-✔ Better Candidate Validation
-
-✔ Stronger Hiring Confidence
+- Corporate Hiring Panels
+- University Placements
+- Scholarship Interviews
+- Faculty Recruitment
+- Leadership Hiring
 
 ---
 
 ## 📊 Candidate Analytics Dashboard
 
-Gain complete visibility into recruitment performance.
+Visualize recruitment performance instantly.
 
-### Analytics Include
+### Metrics
 
-- Candidate Rankings
+- Total Candidates
+- Top Performers
 - Average Scores
-- Hiring Trends
-- Performance Distribution
-- Evaluation Breakdown
-- Role-Based Insights
-- Calibration Metrics
+- Recommendation Distribution
+- Candidate Rankings
+- Performance Trends
 
-### Smart Categorization
+### Insights
 
-Automatically classify candidates as:
-
-🟢 Top Performers
-
-🟡 Mid Performers
-
-🔴 Low Performers
-
-Based on configurable score thresholds.
+- Identify top talent quickly
+- Compare candidates objectively
+- Detect scoring inconsistencies
+- Improve recruitment quality
 
 ---
 
-## 📈 Candidate Scorecards
+## 📈 Calibration Engine
 
-Every candidate receives a detailed evaluation profile.
+TalentCalibrate continuously promotes scoring consistency.
 
-### Scorecard Includes
+### Calibration Includes
 
-- Personal Information
-- Applied Role
-- Rubric Scores
-- Interview Notes
-- Evaluator Feedback
-- Recommendation Status
-- Final Calibrated Score
-
-### Outcome
-
-Complete transparency in hiring decisions.
-
----
-
-## 🧠 Calibration Intelligence
-
-TalentCalibrate helps interview panels remain aligned.
-
-### Calibration Features
-
-- Standardized Rubrics
 - Evaluator Comparison
-- Score Aggregation
-- Decision Alignment
-- Panel Recommendations
+- Score Normalization
+- Rating Trends
+- Candidate Ranking
 
-This ensures hiring quality remains consistent across teams.
+### Result
+
+Higher agreement among evaluators and significantly reduced assessment bias.
+
+---
+
+## 📝 Candidate Scorecards
+
+Every evaluation generates a detailed scorecard.
+
+### Includes
+
+- Candidate Information
+- Rubric Scores
+- Evaluator Notes
+- Recommendations
+- Performance Breakdown
+- Final Percentage Score
+
+Provides complete transparency for every hiring decision.
 
 ---
 
 ## 📂 Candidate Management
 
-Manage recruitment drives efficiently.
+Manage candidates efficiently.
 
-### Features
+### Capabilities
 
-- Candidate Database
-- Bulk Import
-- Candidate Search
-- Candidate Filters
-- Evaluation Tracking
-- Interview History
+- Candidate Import
+- Search & Filter
+- Resume Tracking
+- Assessment History
+- Evaluation Progress
 
-Perfect for handling hundreds or thousands of applicants.
+Suitable for handling hundreds of candidates simultaneously.
 
 ---
 
-## 📤 Export & Reporting
+## 📤 Reporting & Exports
 
-Generate professional reports instantly.
+Export hiring insights in multiple formats.
 
-### Export Options
+### Supported Formats
 
-- CSV Export
-- Excel Export
-- PDF Reports
-- Printable Scorecards
+- CSV
+- Excel
+- PDF
+- Printable Reports
 
-Useful for:
+Generate professional documentation for:
 
 - HR Teams
-- Recruitment Agencies
-- University Placement Cells
-- Management Reviews
+- Placement Cells
+- Hiring Managers
+- Audit Requirements
 
 ---
 
-## 📱 Progressive Web App (PWA)
+## 🌐 Progressive Web App (PWA)
 
-TalentCalibrate behaves like a native application.
+Install TalentCalibrate directly on:
+
+- Android
+- iOS
+- Windows
+- macOS
+- Linux
 
 ### Benefits
 
-✔ Installable
+✅ Offline Access
 
-✔ Offline Access
+✅ Fast Loading
 
-✔ Fast Loading
+✅ Native-App Experience
 
-✔ Mobile Friendly
+✅ Home Screen Installation
 
-✔ Desktop Ready
+✅ Automatic Updates
 
-✔ Home Screen Support
-
-✔ Automatic Updates
+✅ Cross-Platform Compatibility
 
 ---
 
-# 🎨 Modern User Experience
+# 🧠 Scoring System
 
-TalentCalibrate is designed with a premium modern interface.
+TalentCalibrate combines:
 
-### UI Highlights
+### Rubric Evaluation
 
-- Glassmorphism Design
-- Responsive Layout
-- Beautiful Animations
-- Interactive Dashboards
-- Smooth Navigation
-- Mobile First Experience
+60%
 
-The goal is to make hiring enjoyable, efficient, and professional.
+### Likert Assessment
+
+40%
+
+Resulting in a calibrated candidate score between:
+
+```text
+0 - 100%
+```
+
+Performance Categories:
+
+| Score | Classification |
+|---------|----------------|
+| 80+ | High Performer |
+| 50-79 | Potential Candidate |
+| Below 50 | Improvement Needed |
 
 ---
 
-# 🔄 Complete Workflow
+# 📊 Complete Candidate Journey
 
 ```text
 Create Workspace
         ↓
-Build Interview Rubric
+Build Evaluation Rubric
         ↓
 Import Candidates
         ↓
-Schedule Interview
-        ↓
-Conduct Assessment
+Start Interview
         ↓
 Evaluate Candidate
         ↓
-Panel Review (Optional)
+Panel Review
         ↓
-Generate Analytics
+Generate Scorecard
+        ↓
+Analyze Results
         ↓
 Export Reports
         ↓
@@ -347,182 +382,186 @@ Make Hiring Decision
 
 # 🎓 Use Cases
 
-## 🏢 Corporate Recruitment
+## Corporate Recruitment
 
-- Technical Interviews
-- HR Interviews
-- Leadership Hiring
-- Graduate Programs
-
----
-
-## 🎓 Universities
-
-- Campus Placements
-- Internship Screening
-- Student Assessments
-- Scholarship Programs
+- Software Engineers
+- Analysts
+- Managers
+- Internships
 
 ---
 
-## 🏛 Educational Institutions
+## Campus Placements
 
+- Student Screening
+- Placement Drives
+- Internship Selection
+
+---
+
+## Universities
+
+- Scholarship Interviews
 - Faculty Recruitment
-- Research Assistant Selection
-- Academic Interviews
+- Admissions Evaluation
 
 ---
 
-## 🤝 Recruitment Agencies
+## Recruitment Agencies
 
-- Client Hiring Support
 - Candidate Benchmarking
-- Talent Evaluation
+- Client Reporting
+- Hiring Pipelines
 
 ---
 
-# 🔒 Security & Reliability
+# 🔒 Security
 
-TalentCalibrate is built with enterprise-grade reliability.
+TalentCalibrate is built with security-first principles.
 
 ### Security Features
 
 - Workspace Authentication
 - Secure Firebase Backend
 - Cloud Synchronization
-- Role Isolation
-- Persistent Storage
-- Automatic Recovery
-
-### Reliability Features
-
-- Offline Support
-- Auto Save
-- Multi-Tab Persistence
-- Data Synchronization
+- Offline Persistence
+- Data Isolation
+- Session Management
 
 ---
 
-# 🛠 Technology Stack
+# ⚙ Technology Stack
 
 ## Frontend
 
 - HTML5
 - CSS3
-- JavaScript (ES6)
+- JavaScript ES6+
 
 ## Backend
 
 - Firebase Authentication
 - Cloud Firestore
 
-## Data Storage
-
-- IndexedDB
-- Firestore Database
-
-## Reporting
+## Analytics
 
 - Chart.js
+
+## Exports
+
 - SheetJS
-- PDF Generation
+- HTML2PDF
 
-## PWA
+## Storage
 
-- Service Workers
-- Web Manifest
-- Offline Caching
+- IndexedDB
+- Firestore Sync
 
----
+## Platform
 
-# 🌟 Why TalentCalibrate?
-
-| Traditional Interviews | TalentCalibrate |
-|-----------------------|----------------|
-| Subjective Decisions | Structured Evaluations |
-| Manual Notes | Digital Scorecards |
-| Individual Bias | Panel Calibration |
-| Difficult Comparisons | Data-Driven Insights |
-| No Analytics | Advanced Dashboards |
-| Scattered Records | Centralized Workspace |
+- Progressive Web App
 
 ---
 
-# 🚀 Future Roadmap
+# 🎨 UI Philosophy
 
-### AI-Assisted Features
+TalentCalibrate is designed around three principles:
 
-- AI Candidate Summary
-- AI Recommendation Engine
-- Resume Parsing
-- Interview Question Generator
-- Sentiment Analysis
-- Skill Gap Detection
+### Simplicity
 
-### Collaboration Features
+Remove unnecessary complexity.
 
-- Real-Time Team Assessment
-- Shared Evaluator Notes
-- Interview Recording Integration
+### Consistency
 
-### Enterprise Features
+Every action should feel predictable.
 
-- Role-Based Access Control
-- Audit Logs
-- Organization Dashboard
-- Multi-Workspace Management
+### Clarity
 
----
+Insights should be understandable instantly.
 
-# 💡 Vision
+The interface combines:
 
-> "Every hiring decision should be based on evidence, consistency, and calibration — not intuition alone."
-
-TalentCalibrate empowers recruiters, educators, and organizations to discover the right talent through structured assessment and intelligent decision-making.
+- Glassmorphism
+- Modern Gradients
+- Responsive Layouts
+- Smooth Animations
+- Professional Dashboards
 
 ---
 
-# 📷 Platform Preview
+# 🔮 Future Roadmap
 
-```text
-🏢 Workspace
-      ↓
-📋 Rubric Builder
-      ↓
-🎤 Live Interview
-      ↓
-👥 Panel Assessment
-      ↓
-📊 Analytics Dashboard
-      ↓
-📈 Candidate Insights
-      ↓
-📤 Reports & Exports
+### AI Candidate Insights
+
+Generate automated evaluation summaries.
+
+### Resume Intelligence
+
+Extract candidate information automatically.
+
+### Voice-to-Notes
+
+Convert interviewer speech into structured notes.
+
+### Interview Recording Integration
+
+Attach recordings to evaluations.
+
+### Team Calibration Reports
+
+Track evaluator consistency over time.
+
+### Recruitment Intelligence Dashboard
+
+Advanced workforce analytics.
+
+---
+
+# 📸 Screenshots
+
+```md
+Add screenshots here:
+
+screenshots/dashboard.png
+screenshots/interview.png
+screenshots/analytics.png
+screenshots/panel-mode.png
 ```
 
 ---
 
 # 🤝 Contributing
 
-Contributions, feature requests, and suggestions are welcome.
+Contributions are welcome.
 
-If you have ideas that can improve TalentCalibrate, feel free to create issues or submit pull requests.
+Suggestions, improvements, and feature requests help TalentCalibrate become a better hiring intelligence platform.
 
 ---
 
-# 📄 License
+# 📜 License
 
-This project is licensed under the MIT License.
+MIT License
+
+Copyright © 2026 TalentCalibrate
+
+---
+
+# 💜 Final Vision
+
+> Hiring should never depend on memory, intuition, or bias.
+
+TalentCalibrate empowers organizations to discover the right talent through structured evaluation, collaborative assessment, and intelligent analytics.
 
 ---
 
 <p align="center">
+  <img src="photoes/logo.png" width="120">
+</p>
 
-### ⭐ If you like TalentCalibrate, give it a star!
+<h3 align="center">
+Measure Potential. Calibrate Talent. Hire with Confidence.
+</h3>
 
-### Built with 💜 for better hiring decisions.
-
-# TalentCalibrate
-### Measure Potential. Calibrate Talent. Hire with Confidence.
-
+<p align="center">
+Built with 💜 for smarter interviews and better hiring decisions.
 </p>
