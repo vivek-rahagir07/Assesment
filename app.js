@@ -4360,15 +4360,17 @@ async function showTourStep(index) {
   tourDesc.textContent = step.desc;
 
   const tooltipRect = tourTooltip.getBoundingClientRect();
-  let ttLeft = Math.max(12, rect.left);
-  // clamp horizontally so tooltip stays inside viewport
-  ttLeft = Math.min(ttLeft, Math.max(12, window.innerWidth - tooltipRect.width - 12));
+  // center tooltip horizontally relative to the target element
+  let ttLeft = rect.left + (rect.width - tooltipRect.width) / 2;
+  // clamp horizontally so tooltip stays inside viewport with 12px padding
+  ttLeft = Math.max(12, Math.min(ttLeft, Math.max(12, window.innerWidth - tooltipRect.width - 12)));
   let ttTop = rect.bottom + 14;
   // if tooltip would overflow bottom, place it above target
   if (ttTop + tooltipRect.height > window.innerHeight - 12) {
     ttTop = rect.top - tooltipRect.height - 14;
   }
 
+  // ensure tooltip does not go too high
   tourTooltip.style.left = ttLeft + 'px';
   tourTooltip.style.top = Math.max(12, ttTop) + 'px';
 
