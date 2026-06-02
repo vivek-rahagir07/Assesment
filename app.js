@@ -4260,6 +4260,98 @@ const chatbotForm = document.getElementById('chatbot-form');
 const chatbotInput = document.getElementById('chatbot-input');
 const chatbotChips = document.getElementById('chatbot-chips');
 
+// Guided Tour UI elements (created in index.html)
+const btnQuickGuide = document.getElementById('btn-quick-guide');
+const tourOverlay = document.getElementById('tour-overlay');
+const tourHighlight = document.getElementById('tour-highlight-box');
+const tourTooltip = document.getElementById('tour-tooltip');
+const tourTitle = document.getElementById('tour-tooltip-title');
+const tourDesc = document.getElementById('tour-tooltip-desc');
+const tourNext = document.getElementById('tour-next');
+const tourPrev = document.getElementById('tour-prev');
+const tourSkip = document.getElementById('tour-skip');
+
+const TOUR_KEY = 'talentcal_quickguide_seen_v1';
+
+const tourSteps = [
+  { selector: '#btn-mode-create', title: 'Create a workspace', desc: 'Start by creating a new workspace for your team. This stores templates and candidates.' },
+  { selector: '#nav-dashboard', title: 'Evaluation Rubrics', desc: 'Your blueprints live here. Pick a template to start evaluating candidates.' },
+  { selector: '#nav-form-builder', title: 'Customize Rubrics', desc: 'Create or edit templates and adjust criteria weights and questions.' },
+  { selector: '#nav-class-analytics', title: 'Calibration & Analytics', desc: 'View workspace-level stats, export CSV/Excel, and monitor calibration.' },
+  { selector: '#btn-join-panel-dashboard', title: 'Panel Mode', desc: 'Start or join a panel session so multiple evaluators can score the same candidate.' },
+  { selector: '#chatbot-fab', title: 'Assistant', desc: 'Open the assistant for quick help, exports, and guidance at any time.' },
+  { selector: '#btn-switch-ws', title: 'Workspace Switch', desc: 'Use this to switch between different workspaces or teams quickly.' }
+];
+
+let tourIndex = 0;
+
+function showTourStep(index) {
+  const step = tourSteps[index];
+  if (!step) return endTour();
+  const el = document.querySelector(step.selector);
+
+  tourOverlay.classList.remove('hidden');
+  tourOverlay.style.pointerEvents = 'auto';
+
+  // Default tooltip position (center) if element not found
+  let rect = { top: window.innerHeight / 2 - 80, left: window.innerWidth / 2 - 160, width: 320, height: 120 };
+  if (el) {
+    rect = el.getBoundingClientRect();
+    // scroll into view if needed
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      rect = el.getBoundingClientRect();
+    }
+  }
+
+  const pad = 8;
+  // position highlight box around element
+  tourHighlight.style.width = (rect.width + pad * 2) + 'px';
+  tourHighlight.style.height = (rect.height + pad * 2) + 'px';
+  tourHighlight.style.left = (rect.left - pad) + 'px';
+  tourHighlight.style.top = (rect.top - pad) + 'px';
+
+  // tooltip placement: prefer below the element
+  const ttLeft = Math.max(12, rect.left);
+  const ttTop = rect.bottom + 14;
+  tourTooltip.style.left = ttLeft + 'px';
+  tourTooltip.style.top = ttTop + 'px';
+
+  tourTitle.textContent = step.title;
+  tourDesc.textContent = step.desc;
+
+  // update nav buttons
+  tourPrev.disabled = index === 0;
+  tourNext.textContent = index === tourSteps.length - 1 ? 'Finish' : 'Next';
+}
+
+function startTour(auto = false) {
+  tourIndex = 0;
+  showTourStep(tourIndex);
+  if (auto) {
+    // mark seen so it doesn't auto-open every load
+    try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
+  }
+}
+
+function nextTour() { tourIndex += 1; if (tourIndex >= tourSteps.length) endTour(); else showTourStep(tourIndex); }
+function prevTour() { if (tourIndex > 0) { tourIndex -= 1; showTourStep(tourIndex); } }
+function endTour() { tourOverlay.classList.add('hidden'); tourOverlay.style.pointerEvents = 'none'; }
+
+if (btnQuickGuide) btnQuickGuide.addEventListener('click', () => startTour(true));
+if (tourNext) tourNext.addEventListener('click', () => nextTour());
+if (tourPrev) tourPrev.addEventListener('click', () => prevTour());
+if (tourSkip) tourSkip.addEventListener('click', () => { endTour(); try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {} });
+
+// Auto-run tour for first-time users (unless they've seen it)
+try {
+  const seen = localStorage.getItem(TOUR_KEY);
+  if (!seen) {
+    // delay slightly to allow layout to stabilize
+    setTimeout(() => startTour(true), 900);
+  }
+} catch (e) {}
+
 const CHATBOT_SUGGESTED_TOPICS = [
   'How is score calculated?',
   'Explain Panel Mode',
