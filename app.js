@@ -4811,21 +4811,24 @@ setTimeout(attachMicToAllInputs, 1000);
 
 // --- Quick Tag Buttons Feature ---
 document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('quick-tag-btn')) {
+  const quickTagBtn = e.target.closest('.quick-tag-btn');
+  const addCustomTagBtn = e.target.closest('.add-custom-tag-btn');
+
+  if (quickTagBtn) {
     e.preventDefault();
-    const btnContainer = e.target.parentElement;
+    const btnContainer = quickTagBtn.parentElement;
     const textarea = btnContainer.previousElementSibling;
     if (textarea && textarea.tagName === 'TEXTAREA') {
-      const textToAdd = e.target.textContent.replace('+', '').trim();
+      const textToAdd = quickTagBtn.textContent.replace('+', '').trim();
       const currentVal = textarea.value.trim();
       textarea.value = currentVal ? currentVal + ', ' + textToAdd : textToAdd;
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
-  } else if (e.target.classList.contains('add-custom-tag-btn')) {
+  } else if (addCustomTagBtn) {
     e.preventDefault();
     const customTag = prompt("Enter custom tag:");
     if (customTag && customTag.trim() !== '') {
-      const btnContainer = e.target.parentElement;
+      const btnContainer = addCustomTagBtn.parentElement;
       const newBtn = document.createElement('button');
       newBtn.type = 'button';
       
@@ -4833,7 +4836,7 @@ document.addEventListener('click', (e) => {
       newBtn.className = sampleBtn ? sampleBtn.className : 'quick-tag-btn bg-slate-50 hover:bg-slate-100 text-slate-700 text-[10px] px-2 py-1 rounded-full transition-colors';
       newBtn.textContent = '+ ' + customTag.trim();
       
-      btnContainer.insertBefore(newBtn, e.target);
+      btnContainer.insertBefore(newBtn, addCustomTagBtn);
     }
   }
 });
