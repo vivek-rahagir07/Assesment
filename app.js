@@ -1096,14 +1096,46 @@ const renderPanelHubContent = () => {
     } else if (panelScorecards.length === 0) {
       panelHubScorecardsList.innerHTML = '<li class="text-xs text-slate-500 py-2">No scorecards yet for this candidate.</li>';
     } else {
+      const rubrics = activePanel?.templateSnapshot?.rubrics || [];
       panelScorecards.forEach((card) => {
         const li = document.createElement('li');
         const status = card.status === 'submitted' ? 'submitted' : 'draft';
         li.className = `panel-scorecard-item panel-scorecard-item--${status}`;
+        li.style.display = 'block'; // override flex row
+        
         const scoreLabel = card.status === 'submitted' ? `${card.calculatedScore}%` : 'In progress';
+        
+        let detailsHtml = '';
+        if (card.status === 'submitted' && card.scores) {
+          let criteriaRows = '';
+          rubrics.forEach(crit => {
+            const val = card.scores[crit.id] || 'NA';
+            let color = 'text-slate-500';
+            if (val === 'VS') color = 'text-emerald-600 font-bold';
+            if (val === 'S') color = 'text-indigo-600 font-semibold';
+            if (val === 'NS') color = 'text-rose-600 font-bold';
+            criteriaRows += `<div class="flex justify-between text-[11px] py-1 border-b border-slate-100 last:border-0"><span class="text-slate-600 truncate mr-2" title="${escapeHtml(crit.name)}">${escapeHtml(crit.name)}</span><span class="${color}">${val}</span></div>`;
+          });
+          detailsHtml = `
+            <details class="w-full mt-2 group">
+              <summary class="text-[10px] font-bold uppercase tracking-wider text-violet-600 cursor-pointer list-none flex items-center justify-between hover:bg-violet-50 rounded transition p-1">
+                <span>View Breakdown</span>
+                <span class="group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div class="mt-2 pl-2 border-l-2 border-violet-100 mb-1">
+                ${criteriaRows}
+                ${card.notes?.overall ? `<div class="mt-2 text-[10px] text-slate-500 italic">"${escapeHtml(card.notes.overall)}"</div>` : ''}
+              </div>
+            </details>
+          `;
+        }
+
         li.innerHTML = `
-          <span><strong>${escapeHtml(card.interviewerName || 'Evaluator')}</strong>${card.id === user?.uid ? ' <span class="text-violet-600">(you)</span>' : ''}</span>
-          <span class="font-bold tabular-nums">${scoreLabel}</span>
+          <div class="flex items-center justify-between w-full">
+            <span><strong>${escapeHtml(card.interviewerName || 'Evaluator')}</strong>${card.id === user?.uid ? ' <span class="text-violet-600">(you)</span>' : ''}</span>
+            <span class="font-bold tabular-nums">${scoreLabel}</span>
+          </div>
+          ${detailsHtml}
         `;
         panelHubScorecardsList.appendChild(li);
       });
@@ -4723,6 +4755,8 @@ function setupSpeechRecognition(inputEl) {
   
   inputEl.parentElement.appendChild(micBtn);
   
+  let originalValue = '';
+
   micBtn.addEventListener('click', (e) => {
     e.preventDefault();
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -4733,18 +4767,21 @@ function setupSpeechRecognition(inputEl) {
     
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
+    
+    originalValue = inputEl.value; // Store initial value before recognition
     
     micBtn.classList.add('text-rose-500', 'animate-pulse');
     micBtn.classList.remove('text-slate-400');
     
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      if (inputEl.tagName === 'TEXTAREA' || inputEl.value.length > 0) {
-        inputEl.value = inputEl.value ? inputEl.value + ' ' + transcript : transcript;
-      } else {
-        inputEl.value = transcript;
-      }
+      const transcript = Array.from(event.results)
+        .map(result => result[0].transcript)
+        .join('');
+        
+      const prefix = originalValue && originalValue.trim().length > 0 ? originalValue + ' ' : '';
+      inputEl.value = prefix + transcript;
+      
       // trigger input event to update any bindings or validation
       inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     };
@@ -4771,6 +4808,21 @@ function attachMicToAllInputs() {
 // Call on load and after short delay for dynamically rendered sections
 document.addEventListener('DOMContentLoaded', attachMicToAllInputs);
 setTimeout(attachMicToAllInputs, 1000);
+
+// --- Quick Tag Buttons Feature ---
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('quick-tag-btn')) {
+    e.preventDefault();
+    const btnContainer = e.target.parentElement;
+    const textarea = btnContainer.previousElementSibling;
+    if (textarea && textarea.tagName === 'TEXTAREA') {
+      const textToAdd = e.target.textContent.replace('+', '').trim();
+      const currentVal = textarea.value.trim();
+      textarea.value = currentVal ? currentVal + ', ' + textToAdd : textToAdd;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+});
 
 
 
