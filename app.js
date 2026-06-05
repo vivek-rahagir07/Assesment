@@ -3368,6 +3368,7 @@ const renderBuilderCriteria = () => {
   builderCriteria.forEach((crit, index) => {
     const row = document.createElement('div');
     row.className = 'p-3 bg-slate-50 border border-slate-200 rounded-3xl relative flex flex-col gap-4';
+    row.dataset.index = index;
     row.innerHTML = `
       <button type="button" class="btn-remove-builder-row absolute right-3 top-3 text-rose-500 hover:bg-rose-100 p-2 rounded-full transition-colors" title="Delete this criterion" aria-label="Delete criterion">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3408,22 +3409,36 @@ const renderBuilderCriteria = () => {
       </div>
     `;
 
-    row.querySelector('.row-crit-name').addEventListener('input', (e) => { builderCriteria[index].name = e.target.value; });
-    row.querySelector('.row-crit-cat').addEventListener('change', (e) => { builderCriteria[index].category = e.target.value; });
-    row.querySelector('.row-crit-weight').addEventListener('input', (e) => { builderCriteria[index].weight = Number(e.target.value); updateTotalWeightsIndicator(); });
-    row.querySelector('.row-crit-desc').addEventListener('input', (e) => { builderCriteria[index].desc = e.target.value; });
+    const getLiveIndex = () => parseInt(row.dataset.index, 10);
 
-    // Direct delete listener — more reliable than global delegation
+    row.querySelector('.row-crit-name').addEventListener('input', (e) => {
+      const i = getLiveIndex(); if (i >= 0 && i < builderCriteria.length) builderCriteria[i].name = e.target.value;
+    });
+    row.querySelector('.row-crit-cat').addEventListener('change', (e) => {
+      const i = getLiveIndex(); if (i >= 0 && i < builderCriteria.length) builderCriteria[i].category = e.target.value;
+    });
+    row.querySelector('.row-crit-weight').addEventListener('input', (e) => {
+      const i = getLiveIndex();
+      if (i >= 0 && i < builderCriteria.length) {
+        builderCriteria[i].weight = Number(e.target.value) || 0;
+        updateTotalWeightsIndicator();
+      }
+    });
+    row.querySelector('.row-crit-desc').addEventListener('input', (e) => {
+      const i = getLiveIndex(); if (i >= 0 && i < builderCriteria.length) builderCriteria[i].desc = e.target.value;
+    });
+
     row.querySelector('.btn-remove-builder-row').addEventListener('click', (e) => {
       e.preventDefault();
-      e.stopPropagation();
       if (builderCriteria.length <= 1) {
         showToast('Form must have at least one criteria element.', 'error');
         return;
       }
-      builderCriteria.splice(index, 1);
-      renderBuilderCriteria();
-      updateTotalWeightsIndicator();
+      const i = getLiveIndex();
+      if (i >= 0 && i < builderCriteria.length) {
+        builderCriteria.splice(i, 1);
+        renderBuilderCriteria();
+      }
     });
 
     criteriaInputsContainer.appendChild(row);
@@ -3435,10 +3450,22 @@ const renderBuilderCriteria = () => {
 };
 
 const updateTotalWeightsIndicator = () => {
-  const sum = builderCriteria.reduce((acc, c) => acc + Number(c.weight || 0), 0);
   const indicator = document.getElementById('criteria-weight-indicator');
+  const bar = document.getElementById('criteria-weight-bar');
+  if (!indicator) return;
+  const sum = builderCriteria.reduce((acc, c) => acc + (Number(c.weight) || 0), 0);
   indicator.textContent = `${sum}%`;
-  indicator.className = sum === 100 ? 'text-emerald-600 font-extrabold' : 'text-amber-600 font-bold';
+  const isExact = sum === 100;
+  const isOver = sum > 100;
+  indicator.className = isExact
+    ? 'text-emerald-600 font-extrabold'
+    : isOver ? 'text-rose-600 font-extrabold' : 'text-amber-600 font-bold';
+  if (bar) {
+    const pct = Math.min(sum, 100);
+    bar.style.width = pct + '%';
+    bar.className = 'h-full rounded-full transition-all duration-300 ' +
+      (isExact ? 'bg-emerald-500' : isOver ? 'bg-rose-500' : 'bg-amber-400');
+  }
 };
 
 btnAddCriteria.addEventListener('click', () => {
@@ -4821,7 +4848,8 @@ document.addEventListener('click', (e) => {
   const quickTagBtn = e.target.closest('.quick-tag-btn');
   const addCustomTagBtn = e.target.closest('.add-custom-tag-btn');
   const deleteLiveCritBtn = e.target.closest('.btn-delete-live-crit');
-  const removeBuilderRowBtn = e.target.closest('.btn-remove-builder-row');
+  // Note: .btn-remove-builder-row is handled via direct listener in renderBuilderCriteria
+  if (e.target.closest('.btn-remove-builder-row')) return;
 
   if (quickTagBtn) {
     e.preventDefault();
