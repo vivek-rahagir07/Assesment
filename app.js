@@ -3369,7 +3369,15 @@ const renderBuilderCriteria = () => {
     const row = document.createElement('div');
     row.className = 'p-3 bg-slate-50 border border-slate-200 rounded-3xl relative flex flex-col gap-4';
     row.innerHTML = `
-      <button type="button" class="btn-remove-builder-row absolute right-3 top-3 text-rose-500 hover:bg-rose-50 p-2 rounded-full">✕</button>
+      <button type="button" class="btn-remove-builder-row absolute right-3 top-3 text-rose-500 hover:bg-rose-100 p-2 rounded-full transition-colors" title="Delete this criterion" aria-label="Delete criterion">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path>
+          <path d="M10 11v6"></path>
+          <path d="M14 11v6"></path>
+          <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path>
+        </svg>
+      </button>
       <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pr-6">
         <div class="md:col-span-5">
           <label class="block text-[10px] font-bold text-slate-400 uppercase">Assessment Field Name</label>
@@ -3404,6 +3412,19 @@ const renderBuilderCriteria = () => {
     row.querySelector('.row-crit-cat').addEventListener('change', (e) => { builderCriteria[index].category = e.target.value; });
     row.querySelector('.row-crit-weight').addEventListener('input', (e) => { builderCriteria[index].weight = Number(e.target.value); updateTotalWeightsIndicator(); });
     row.querySelector('.row-crit-desc').addEventListener('input', (e) => { builderCriteria[index].desc = e.target.value; });
+
+    // Direct delete listener — more reliable than global delegation
+    row.querySelector('.btn-remove-builder-row').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (builderCriteria.length <= 1) {
+        showToast('Form must have at least one criteria element.', 'error');
+        return;
+      }
+      builderCriteria.splice(index, 1);
+      renderBuilderCriteria();
+      updateTotalWeightsIndicator();
+    });
 
     criteriaInputsContainer.appendChild(row);
     if (typeof setupSpeechRecognition === 'function') {
@@ -4840,23 +4861,8 @@ document.addEventListener('click', (e) => {
       activeInterviewTemplate.criteria.splice(idx, 1);
       renderLiveInterviewSheet();
     }
-  } else if (removeBuilderRowBtn) {
-    e.preventDefault();
-    // Assuming container structure from renderBuilderCriteria
-    const row = removeBuilderRowBtn.closest('div.p-3.bg-slate-50');
-    const container = document.getElementById('criteria-inputs-container');
-    const idx = Array.from(container.children).indexOf(row);
-    
-    if (idx !== -1 && builderCriteria) {
-      if (builderCriteria.length <= 1) {
-        showToast('Form must have at least one criteria element.', 'error');
-        return;
-      }
-      builderCriteria.splice(idx, 1);
-      renderBuilderCriteria();
-      updateTotalWeightsIndicator();
-    }
   }
+  // Note: btn-remove-builder-row is handled via direct listener in renderBuilderCriteria
 });
 
 
