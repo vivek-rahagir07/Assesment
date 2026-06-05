@@ -4821,6 +4821,20 @@ document.addEventListener('click', (e) => {
       textarea.value = currentVal ? currentVal + ', ' + textToAdd : textToAdd;
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
+  } else if (e.target.classList.contains('add-custom-tag-btn')) {
+    e.preventDefault();
+    const customTag = prompt("Enter custom tag:");
+    if (customTag && customTag.trim() !== '') {
+      const btnContainer = e.target.parentElement;
+      const newBtn = document.createElement('button');
+      newBtn.type = 'button';
+      
+      const sampleBtn = btnContainer.querySelector('.quick-tag-btn');
+      newBtn.className = sampleBtn ? sampleBtn.className : 'quick-tag-btn bg-slate-50 hover:bg-slate-100 text-slate-700 text-[10px] px-2 py-1 rounded-full transition-colors';
+      newBtn.textContent = '+ ' + customTag.trim();
+      
+      btnContainer.insertBefore(newBtn, e.target);
+    }
   }
 });
 
