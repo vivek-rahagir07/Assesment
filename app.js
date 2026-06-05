@@ -505,9 +505,17 @@ workspaceForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  if (!/^[a-zA-Z0-9_-]{2,64}$/.test(wsName)) {
-    showLoginError('Workspace name: 2–64 characters, letters, numbers, _ and - only.');
+  if (wsName.length < 2 || wsName.length > 64) {
+    showLoginError('Workspace name must be between 2 and 64 characters.');
     return;
+  }
+
+  if (wsMode === 'create') {
+    const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    if (!passRegex.test(wsPass)) {
+      showLoginError('Password must be at least 8 chars with an uppercase, lowercase, number, and special character.');
+      return;
+    }
   }
 
   setSubmitLoading(true);
