@@ -3404,11 +3404,6 @@ const renderBuilderCriteria = () => {
     row.querySelector('.row-crit-cat').addEventListener('change', (e) => { builderCriteria[index].category = e.target.value; });
     row.querySelector('.row-crit-weight').addEventListener('input', (e) => { builderCriteria[index].weight = Number(e.target.value); updateTotalWeightsIndicator(); });
     row.querySelector('.row-crit-desc').addEventListener('input', (e) => { builderCriteria[index].desc = e.target.value; });
-    row.querySelector('.btn-remove-builder-row').addEventListener('click', () => {
-      builderCriteria.splice(index, 1);
-      renderBuilderCriteria();
-      updateTotalWeightsIndicator();
-    });
 
     criteriaInputsContainer.appendChild(row);
     if (typeof setupSpeechRecognition === 'function') {
@@ -3514,15 +3509,6 @@ const renderLiveInterviewSheet = () => {
     row.querySelector('.live-crit-weight-input').addEventListener('input', (e) => {
       c.weight = Number(e.target.value || 0);
       updateLiveComputedScore();
-    });
-
-    row.querySelector('.btn-delete-live-crit').addEventListener('click', () => {
-      if (activeInterviewTemplate.criteria.length <= 1) {
-        showToast('You must keep at least one assessment criteria.', 'error');
-        return;
-      }
-      activeInterviewTemplate.criteria.splice(idx, 1);
-      renderLiveInterviewSheet();
     });
 
     row.querySelector('.criteria-note-input').addEventListener('input', (e) => {
@@ -4813,6 +4799,8 @@ setTimeout(attachMicToAllInputs, 1000);
 document.addEventListener('click', (e) => {
   const quickTagBtn = e.target.closest('.quick-tag-btn');
   const addCustomTagBtn = e.target.closest('.add-custom-tag-btn');
+  const deleteLiveCritBtn = e.target.closest('.btn-delete-live-crit');
+  const removeBuilderRowBtn = e.target.closest('.btn-remove-builder-row');
 
   if (quickTagBtn) {
     e.preventDefault();
@@ -4837,6 +4825,36 @@ document.addEventListener('click', (e) => {
       newBtn.textContent = '+ ' + customTag.trim();
       
       btnContainer.insertBefore(newBtn, addCustomTagBtn);
+    }
+  } else if (deleteLiveCritBtn) {
+    e.preventDefault();
+    const criteriaCard = deleteLiveCritBtn.closest('.criteria-card');
+    const container = document.getElementById('live-rating-criteria-container');
+    const idx = Array.from(container.children).indexOf(criteriaCard);
+    
+    if (idx !== -1 && activeInterviewTemplate && activeInterviewTemplate.criteria) {
+      if (activeInterviewTemplate.criteria.length <= 1) {
+        showToast('You must keep at least one assessment criteria.', 'error');
+        return;
+      }
+      activeInterviewTemplate.criteria.splice(idx, 1);
+      renderLiveInterviewSheet();
+    }
+  } else if (removeBuilderRowBtn) {
+    e.preventDefault();
+    // Assuming container structure from renderBuilderCriteria
+    const row = removeBuilderRowBtn.closest('div.p-3.bg-slate-50');
+    const container = document.getElementById('criteria-inputs-container');
+    const idx = Array.from(container.children).indexOf(row);
+    
+    if (idx !== -1 && builderCriteria) {
+      if (builderCriteria.length <= 1) {
+        showToast('Form must have at least one criteria element.', 'error');
+        return;
+      }
+      builderCriteria.splice(idx, 1);
+      renderBuilderCriteria();
+      updateTotalWeightsIndicator();
     }
   }
 });
