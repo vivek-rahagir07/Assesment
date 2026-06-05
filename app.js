@@ -127,6 +127,7 @@ const authStatusLabel = document.getElementById('auth-status-label');
 const templatesGrid = document.getElementById('templates-grid');
 const criteriaInputsContainer = document.getElementById('criteria-inputs-container');
 const btnAddCriteria = document.getElementById('btn-add-criteria');
+const btnAddCriteriaBottom = document.getElementById('btn-add-criteria-bottom');
 const templateEditorForm = document.getElementById('template-editor-form');
 const formBuilderHeaderTitle = document.getElementById('form-builder-header-title');
 const cutoffHighSlider = document.getElementById('cutoff-high');
@@ -3378,6 +3379,9 @@ const renderBuilderCriteria = () => {
     });
 
     criteriaInputsContainer.appendChild(row);
+    if (typeof setupSpeechRecognition === 'function') {
+      row.querySelectorAll('input[type="text"]').forEach(setupSpeechRecognition);
+    }
   });
   updateTotalWeightsIndicator();
 };
@@ -3393,6 +3397,13 @@ btnAddCriteria.addEventListener('click', () => {
   builderCriteria.push({ id: `crit-${Date.now()}`, name: '', category: 'Custom Skill', maxScore: 3, weight: 10, desc: '' });
   renderBuilderCriteria();
 });
+
+if (btnAddCriteriaBottom) {
+  btnAddCriteriaBottom.addEventListener('click', () => {
+    builderCriteria.push({ id: `crit-${Date.now()}`, name: '', category: 'Custom Skill', maxScore: 3, weight: 10, desc: '' });
+    renderBuilderCriteria();
+  });
+}
 
 const renderLiveInterviewSheet = () => {
   const criteriaContainer = document.getElementById('live-rating-criteria-container');
@@ -4687,5 +4698,79 @@ If offline, all evaluation drafts and completed scorecards are saved locally usi
 • "Show workspace stats"
 • "How do I export results?"`;
 }
+
+// --- Speech to Text Feature ---
+function setupSpeechRecognition(inputEl) {
+  if (inputEl.parentElement.classList.contains('has-mic')) return;
+  if (inputEl.type === 'date' || inputEl.type === 'number' || inputEl.type === 'password' || inputEl.type === 'file') return;
+  
+  inputEl.parentElement.classList.add('has-mic');
+  inputEl.parentElement.style.position = 'relative';
+  
+  const micBtn = document.createElement('button');
+  micBtn.type = 'button';
+  micBtn.title = 'Click to speak';
+  micBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>';
+  
+  if (inputEl.tagName === 'TEXTAREA') {
+    micBtn.className = 'absolute right-3 top-3 text-slate-400 hover:text-indigo-600 transition p-1 bg-white rounded-full';
+  } else {
+    micBtn.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition p-1 bg-white rounded-full';
+  }
+  
+  // ensure the input has padding right so text doesn't overlap mic
+  inputEl.style.paddingRight = '2.5rem';
+  
+  inputEl.parentElement.appendChild(micBtn);
+  
+  micBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('Speech recognition is not supported in this browser.', 'error');
+      return;
+    }
+    
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    micBtn.classList.add('text-rose-500', 'animate-pulse');
+    micBtn.classList.remove('text-slate-400');
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      if (inputEl.tagName === 'TEXTAREA' || inputEl.value.length > 0) {
+        inputEl.value = inputEl.value ? inputEl.value + ' ' + transcript : transcript;
+      } else {
+        inputEl.value = transcript;
+      }
+      // trigger input event to update any bindings or validation
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      showToast('Speech recognition error: ' + event.error, 'error');
+    };
+    
+    recognition.onend = () => {
+      micBtn.classList.remove('text-rose-500', 'animate-pulse');
+      micBtn.classList.add('text-slate-400');
+    };
+    
+    recognition.start();
+  });
+}
+
+function attachMicToAllInputs() {
+  const inputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
+  inputs.forEach(setupSpeechRecognition);
+}
+
+// Call on load and after short delay for dynamically rendered sections
+document.addEventListener('DOMContentLoaded', attachMicToAllInputs);
+setTimeout(attachMicToAllInputs, 1000);
+
 
 
