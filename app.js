@@ -3370,16 +3370,7 @@ const renderBuilderCriteria = () => {
     row.className = 'p-3 bg-slate-50 border border-slate-200 rounded-3xl relative flex flex-col gap-4';
     row.dataset.index = index;
     row.innerHTML = `
-      <button type="button" class="btn-remove-builder-row absolute right-3 top-3 text-rose-500 hover:bg-rose-100 p-2 rounded-full transition-colors" title="Delete this criterion" aria-label="Delete criterion">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path>
-          <path d="M10 11v6"></path>
-          <path d="M14 11v6"></path>
-          <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path>
-        </svg>
-      </button>
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-3 pr-6">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
         <div class="md:col-span-5">
           <label class="block text-[10px] font-bold text-slate-400 uppercase">Assessment Field Name</label>
           <input type="text" class="row-crit-name w-full bg-white border border-slate-300 rounded-2xl p-3 text-sm focus:outline-none" value="${crit.name}" required>
@@ -3399,9 +3390,24 @@ const renderBuilderCriteria = () => {
           <label class="block text-[10px] font-bold text-slate-400 uppercase">Max (VS Value)</label>
           <input type="number" class="w-full bg-slate-100 border border-slate-200 rounded-2xl p-3 text-sm text-slate-500 focus:outline-none" value="${crit.maxScore || 3}" readonly>
         </div>
-        <div class="md:col-span-2">
-          <label class="block text-[10px] font-bold text-slate-400 uppercase">Weightage %</label>
-          <input type="number" min="1" max="100" class="row-crit-weight w-full bg-white border border-slate-300 rounded-2xl p-3 text-sm focus:outline-none" value="${crit.weight}" required>
+        <div class="md:col-span-2 flex items-end gap-2">
+          <div class="flex-grow">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase">Weightage %</label>
+            <div class="flex items-center bg-white border border-slate-300 rounded-2xl overflow-hidden h-[46px]">
+              <button type="button" class="btn-weight-dec h-full px-2.5 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-base" aria-label="Decrease weight">-</button>
+              <input type="number" min="1" max="100" class="row-crit-weight w-full bg-transparent border-none text-center p-0 text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value="${crit.weight}" required>
+              <button type="button" class="btn-weight-inc h-full px-2.5 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-base" aria-label="Increase weight">+</button>
+            </div>
+          </div>
+          <button type="button" class="btn-remove-builder-row text-rose-500 hover:bg-rose-100 p-2 rounded-full transition-colors z-20 flex-shrink-0 mb-[2px] h-[42px] w-[42px] flex items-center justify-center" title="Delete this criterion" aria-label="Delete criterion">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path>
+              <path d="M10 11v6"></path>
+              <path d="M14 11v6"></path>
+              <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path>
+            </svg>
+          </button>
         </div>
         <div class="md:col-span-12">
           <input type="text" class="row-crit-desc w-full bg-white border border-slate-300 rounded-2xl p-3 text-sm focus:outline-none" placeholder="Define expectations / help prompts..." value="${crit.desc || ''}">
@@ -3424,12 +3430,39 @@ const renderBuilderCriteria = () => {
         updateTotalWeightsIndicator();
       }
     });
+    row.querySelector('.btn-weight-dec').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const i = getLiveIndex();
+      if (i >= 0 && i < builderCriteria.length) {
+        const input = row.querySelector('.row-crit-weight');
+        let val = Number(input.value) || 0;
+        val = Math.max(1, val - 5);
+        input.value = val;
+        builderCriteria[i].weight = val;
+        updateTotalWeightsIndicator();
+      }
+    });
+    row.querySelector('.btn-weight-inc').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const i = getLiveIndex();
+      if (i >= 0 && i < builderCriteria.length) {
+        const input = row.querySelector('.row-crit-weight');
+        let val = Number(input.value) || 0;
+        val = Math.min(100, val + 5);
+        input.value = val;
+        builderCriteria[i].weight = val;
+        updateTotalWeightsIndicator();
+      }
+    });
     row.querySelector('.row-crit-desc').addEventListener('input', (e) => {
       const i = getLiveIndex(); if (i >= 0 && i < builderCriteria.length) builderCriteria[i].desc = e.target.value;
     });
 
     row.querySelector('.btn-remove-builder-row').addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (builderCriteria.length <= 1) {
         showToast('Form must have at least one criteria element.', 'error');
         return;
@@ -3799,7 +3832,7 @@ const triggerEditTemplate = (template) => {
   document.getElementById('tpl-title').value = template.title;
   document.getElementById('tpl-role').value = template.role || '';
   document.getElementById('tpl-desc').value = template.description || '';
-  builderCriteria = template.criteria || [...MANDATORY_CRITERIA_DEFAULTS];
+  builderCriteria = JSON.parse(JSON.stringify(template.criteria || MANDATORY_CRITERIA_DEFAULTS));
   formBuilderHeaderTitle.textContent = 'Configure Existing Form Rubrics';
   switchTab('form-builder');
 };
