@@ -4893,8 +4893,8 @@ document.addEventListener('click', (e) => {
   const quickTagBtn = e.target.closest('.quick-tag-btn');
   const addCustomTagBtn = e.target.closest('.add-custom-tag-btn');
   const deleteLiveCritBtn = e.target.closest('.btn-delete-live-crit');
-  // Note: .btn-remove-builder-row is handled via direct listener in renderBuilderCriteria
-  if (e.target.closest('.btn-remove-builder-row')) return;
+  // btn-remove-builder-row is handled via delegated listener on criteriaInputsContainer
+  if (e.target.closest('.btn-remove-builder-row') || e.target.closest('.btn-weight-dec') || e.target.closest('.btn-weight-inc')) return;
 
   if (quickTagBtn) {
     e.preventDefault();
@@ -4935,7 +4935,6 @@ document.addEventListener('click', (e) => {
       renderLiveInterviewSheet();
     }
   }
-  // Note: btn-remove-builder-row is handled via direct listener in renderBuilderCriteria
 });
 
 
