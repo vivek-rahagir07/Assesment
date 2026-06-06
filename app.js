@@ -3399,7 +3399,7 @@ const renderBuilderCriteria = () => {
               <button type="button" class="btn-weight-inc h-full px-2.5 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-base" aria-label="Increase weight">+</button>
             </div>
           </div>
-          <button type="button" class="btn-remove-builder-row text-rose-600 hover:bg-rose-50 rounded-2xl border border-rose-200 transition font-bold text-base flex-shrink-0 h-[46px] w-[46px] flex items-center justify-center" title="Delete this criterion" aria-label="Delete criterion">
+          <button type="button" class="btn-remove-builder-row text-rose-600 hover:bg-rose-50 rounded-2xl border border-rose-200 transition font-bold text-base flex-shrink-0 h-[46px] w-[46px] flex items-center justify-center relative z-30" title="Delete this criterion" aria-label="Delete criterion">
             ✕
           </button>
         </div>
