@@ -3395,7 +3395,7 @@ const renderBuilderCriteria = () => {
             <label class="block text-[10px] font-bold text-slate-400 uppercase">Weightage %</label>
             <div class="flex items-center bg-white border border-slate-300 rounded-2xl overflow-hidden h-[46px]">
               <button type="button" class="btn-weight-dec h-full px-2.5 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-base" aria-label="Decrease weight">-</button>
-              <input type="number" min="1" max="100" class="row-crit-weight w-full bg-transparent border-none text-center p-0 text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value="${crit.weight}" required>
+              <input type="number" min="1" max="100" class="row-crit-weight h-full w-full bg-transparent border-none text-center p-0 text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value="${crit.weight}" required>
               <button type="button" class="btn-weight-inc h-full px-2.5 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-base" aria-label="Increase weight">+</button>
             </div>
           </div>
