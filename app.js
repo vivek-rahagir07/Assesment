@@ -3400,7 +3400,7 @@ const renderBuilderCriteria = () => {
             </div>
           </div>
           <button type="button" class="btn-remove-builder-row text-rose-500 hover:bg-rose-100 p-2 rounded-full transition-colors z-20 flex-shrink-0 mb-[2px] h-[42px] w-[42px] flex items-center justify-center" title="Delete this criterion" aria-label="Delete criterion">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="pointer-events-none" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path>
               <path d="M10 11v6"></path>
@@ -3415,65 +3415,6 @@ const renderBuilderCriteria = () => {
       </div>
     `;
 
-    const getLiveIndex = () => parseInt(row.dataset.index, 10);
-
-    row.querySelector('.row-crit-name').addEventListener('input', (e) => {
-      const i = getLiveIndex(); if (i >= 0 && i < builderCriteria.length) builderCriteria[i].name = e.target.value;
-    });
-    row.querySelector('.row-crit-cat').addEventListener('change', (e) => {
-      const i = getLiveIndex(); if (i >= 0 && i < builderCriteria.length) builderCriteria[i].category = e.target.value;
-    });
-    row.querySelector('.row-crit-weight').addEventListener('input', (e) => {
-      const i = getLiveIndex();
-      if (i >= 0 && i < builderCriteria.length) {
-        builderCriteria[i].weight = Number(e.target.value) || 0;
-        updateTotalWeightsIndicator();
-      }
-    });
-    row.querySelector('.btn-weight-dec').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const i = getLiveIndex();
-      if (i >= 0 && i < builderCriteria.length) {
-        const input = row.querySelector('.row-crit-weight');
-        let val = Number(input.value) || 0;
-        val = Math.max(1, val - 5);
-        input.value = val;
-        builderCriteria[i].weight = val;
-        updateTotalWeightsIndicator();
-      }
-    });
-    row.querySelector('.btn-weight-inc').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const i = getLiveIndex();
-      if (i >= 0 && i < builderCriteria.length) {
-        const input = row.querySelector('.row-crit-weight');
-        let val = Number(input.value) || 0;
-        val = Math.min(100, val + 5);
-        input.value = val;
-        builderCriteria[i].weight = val;
-        updateTotalWeightsIndicator();
-      }
-    });
-    row.querySelector('.row-crit-desc').addEventListener('input', (e) => {
-      const i = getLiveIndex(); if (i >= 0 && i < builderCriteria.length) builderCriteria[i].desc = e.target.value;
-    });
-
-    row.querySelector('.btn-remove-builder-row').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (builderCriteria.length <= 1) {
-        showToast('Form must have at least one criteria element.', 'error');
-        return;
-      }
-      const i = getLiveIndex();
-      if (i >= 0 && i < builderCriteria.length) {
-        builderCriteria.splice(i, 1);
-        renderBuilderCriteria();
-      }
-    });
-
     criteriaInputsContainer.appendChild(row);
     if (typeof setupSpeechRecognition === 'function') {
       row.querySelectorAll('input[type="text"]').forEach(setupSpeechRecognition);
@@ -3481,6 +3422,83 @@ const renderBuilderCriteria = () => {
   });
   updateTotalWeightsIndicator();
 };
+
+// Delegated events for builder inputs, dropdowns and action buttons
+if (criteriaInputsContainer) {
+  criteriaInputsContainer.addEventListener('click', (e) => {
+    const decBtn = e.target.closest('.btn-weight-dec');
+    const incBtn = e.target.closest('.btn-weight-inc');
+    const removeBtn = e.target.closest('.btn-remove-builder-row');
+    
+    if (decBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const row = decBtn.closest('[data-index]');
+      const index = parseInt(row.dataset.index, 10);
+      if (index >= 0 && index < builderCriteria.length) {
+        const input = row.querySelector('.row-crit-weight');
+        let val = Number(input.value) || 0;
+        val = Math.max(1, val - 5);
+        input.value = val;
+        builderCriteria[index].weight = val;
+        updateTotalWeightsIndicator();
+      }
+    } else if (incBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const row = incBtn.closest('[data-index]');
+      const index = parseInt(row.dataset.index, 10);
+      if (index >= 0 && index < builderCriteria.length) {
+        const input = row.querySelector('.row-crit-weight');
+        let val = Number(input.value) || 0;
+        val = Math.min(100, val + 5);
+        input.value = val;
+        builderCriteria[index].weight = val;
+        updateTotalWeightsIndicator();
+      }
+    } else if (removeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (builderCriteria.length <= 1) {
+        showToast('Form must have at least one criteria element.', 'error');
+        return;
+      }
+      const row = removeBtn.closest('[data-index]');
+      const index = parseInt(row.dataset.index, 10);
+      if (index >= 0 && index < builderCriteria.length) {
+        builderCriteria.splice(index, 1);
+        renderBuilderCriteria();
+      }
+    }
+  });
+
+  criteriaInputsContainer.addEventListener('input', (e) => {
+    const row = e.target.closest('[data-index]');
+    if (!row) return;
+    const index = parseInt(row.dataset.index, 10);
+    if (index < 0 || index >= builderCriteria.length) return;
+    
+    if (e.target.classList.contains('row-crit-name')) {
+      builderCriteria[index].name = e.target.value;
+    } else if (e.target.classList.contains('row-crit-weight')) {
+      builderCriteria[index].weight = Number(e.target.value) || 0;
+      updateTotalWeightsIndicator();
+    } else if (e.target.classList.contains('row-crit-desc')) {
+      builderCriteria[index].desc = e.target.value;
+    }
+  });
+
+  criteriaInputsContainer.addEventListener('change', (e) => {
+    const row = e.target.closest('[data-index]');
+    if (!row) return;
+    const index = parseInt(row.dataset.index, 10);
+    if (index < 0 || index >= builderCriteria.length) return;
+    
+    if (e.target.classList.contains('row-crit-cat')) {
+      builderCriteria[index].category = e.target.value;
+    }
+  });
+}
 
 const updateTotalWeightsIndicator = () => {
   const indicator = document.getElementById('criteria-weight-indicator');
