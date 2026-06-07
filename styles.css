@@ -2418,3 +2418,12 @@ select:focus-visible {
   background: rgba(99, 102, 241, 0.3);
 }
 
+/* Hide number input spinners for clean UI */
+.weight-input-no-spin::-webkit-outer-spin-button,
+.weight-input-no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.weight-input-no-spin[type=number] {
+  -moz-appearance: textfield;
+}

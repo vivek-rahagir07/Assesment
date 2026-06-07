@@ -3364,12 +3364,12 @@ const renderBuilderCriteria = () => {
     row.className = 'p-3 bg-slate-50 border border-slate-200 rounded-3xl relative flex flex-col gap-4';
     row.dataset.index = index;
     row.innerHTML = `
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-        <div class="md:col-span-5">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+        <div class="md:col-span-4">
           <label class="block text-[10px] font-bold text-slate-400 uppercase">Assessment Field Name</label>
           <input type="text" class="row-crit-name w-full bg-white border border-slate-300 rounded-2xl p-3 text-sm focus:outline-none" value="${crit.name}" required>
         </div>
-        <div class="md:col-span-3">
+        <div class="md:col-span-2">
           <label class="block text-[10px] font-bold text-slate-400 uppercase">Category</label>
           <select class="row-crit-cat w-full bg-white border border-slate-300 rounded-2xl p-3 text-sm focus:outline-none">
             <option value="Communication" ${crit.category === 'Communication' ? 'selected' : ''}>Communication</option>
@@ -3384,13 +3384,13 @@ const renderBuilderCriteria = () => {
           <label class="block text-[10px] font-bold text-slate-400 uppercase">Max (VS Value)</label>
           <input type="number" class="w-full bg-slate-100 border border-slate-200 rounded-2xl p-3 text-sm text-slate-500 focus:outline-none" value="${crit.maxScore || 3}" readonly>
         </div>
-        <div class="md:col-span-2 flex items-end gap-2">
+        <div class="md:col-span-4 flex items-end gap-2">
           <div class="flex-grow">
             <label class="block text-[10px] font-bold text-slate-400 uppercase">Weightage %</label>
-            <div class="flex items-center bg-white border border-slate-300 rounded-2xl overflow-hidden h-[46px]">
-              <button type="button" class="btn-weight-dec h-full px-2.5 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-base" aria-label="Decrease weight">-</button>
-              <input type="number" min="1" max="100" class="row-crit-weight h-full w-full bg-transparent border-none text-center p-0 text-sm focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value="${crit.weight}" required>
-              <button type="button" class="btn-weight-inc h-full px-2.5 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-base" aria-label="Increase weight">+</button>
+            <div class="flex items-center bg-white border border-slate-300 rounded-2xl h-[46px]">
+              <button type="button" class="btn-weight-dec flex-shrink-0 h-full px-3 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-lg rounded-l-2xl" aria-label="Decrease weight">−</button>
+              <input type="number" min="1" max="100" class="row-crit-weight weight-input-no-spin h-full bg-transparent border-none text-center text-sm font-semibold focus:outline-none" style="min-width:44px;width:52px;" value="${crit.weight}" required>
+              <button type="button" class="btn-weight-inc flex-shrink-0 h-full px-3 text-slate-500 hover:bg-slate-100 transition-colors font-bold text-lg rounded-r-2xl" aria-label="Increase weight">+</button>
             </div>
           </div>
           <button type="button" class="btn-remove-builder-row text-rose-600 hover:bg-rose-50 rounded-2xl border border-rose-200 transition font-bold text-base flex-shrink-0 h-[46px] w-[46px] flex items-center justify-center relative z-30" title="Delete this criterion" aria-label="Delete criterion">
